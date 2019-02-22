@@ -6,7 +6,7 @@ import (
 )
 
 // Name can be used from other packages to refer to this protocol.
-const Name = "SimpleBlscosi"
+const Name = "SimpleBlsCoSi"
 
 func init() {
 	network.RegisterMessages(&SimplePrepare{}, &SimplePrepareReply{}, &SimpleCommit{}, &SimpleCommitReply{})

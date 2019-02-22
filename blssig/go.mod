@@ -1,4 +1,4 @@
-module github.com/dedis/student_19_proof-of-loc
+module github.com/dedis/student_19_proof-of-loc/blssig
 
 require (
 	github.com/dedis/cothority_template v0.0.0-20190213155047-1f446a5dec24

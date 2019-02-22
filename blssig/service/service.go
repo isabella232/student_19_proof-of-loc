@@ -9,15 +9,12 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/dedis/student_19_proof-of-loc"
-	"github.com/dedis/student_19_proof-of-loc/blssig"
+	proofofloc "github.com/dedis/student_19_proof-of-loc/blssig"
 	"github.com/dedis/student_19_proof-of-loc/blssig/protocol"
 
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
-	
-	""
 )
 
 // Used for tests
@@ -36,9 +33,6 @@ type SimpleBLSCoSiService struct {
 	// are correctly handled.
 	*onet.ServiceProcessor
 
-	//the client given input
-	input string
-
 	storage *storage
 }
 
@@ -48,8 +42,37 @@ var storageID = []byte("main")
 
 // storage is used to save our data.
 type storage struct {
-	Count int
+	Signed []byte
 	sync.Mutex
+}
+
+// Sign returns the messaged signed by the instantiations of the protocol.
+func (s *SimpleBLSCoSiService) Sign(req *proofofloc.Signed) (*proofofloc.SignedReply, error) {
+
+	tree := req.Roster.GenerateNaryTreeWithRoot(2, s.ServerIdentity())
+	if tree == nil {
+		return nil, errors.New("couldn't create tree")
+	}
+
+	//Start protocol
+	p, err := s.CreateProtocol(protocol.Name, tree)
+	if err != nil {
+		return nil, err
+	}
+
+	// Register the function generating the protocol instance
+	var root *protocol.SimpleBLSCoSi
+
+	root = p.(*protocol.SimpleBLSCoSi)
+	root.Message = req.ToSign
+
+	p.Start()
+
+	resp := &proofofloc.SignedReply{
+		Signed: <-p.(*protocol.SimpleBLSCoSi).FinalSignature,
+	}
+
+	return resp, nil
 }
 
 // NewProtocol is called on all nodes of a Tree (except the root, since it is
@@ -95,12 +118,11 @@ func (s *SimpleBLSCoSiService) tryLoad() error {
 // newService receives the context that holds information about the node it's
 // running on. Saving and loading can be done using the context. The data will
 // be stored in memory for tests and simulations, and on disk for real deployments.
-func newService(c *onet.Context) (onet.Service, error, input string) {
+func newService(c *onet.Context) (onet.Service, error) {
 	s := &SimpleBLSCoSiService{
 		ServiceProcessor: onet.NewServiceProcessor(c),
-		input: input,
 	}
-	if err := s.RegisterHandlers(s.Clock, s.Count); err != nil {
+	if err := s.RegisterHandlers(s.Sign); err != nil {
 		return nil, errors.New("Couldn't register messages")
 	}
 	if err := s.tryLoad(); err != nil {
