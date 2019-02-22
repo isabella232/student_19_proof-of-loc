@@ -1,13 +1,14 @@
-package simpleblscosi
+package protocol
 
 import (
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
-	"testing"
-	"time"
 )
 
 const protoName = "testProtocol"

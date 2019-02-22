@@ -22,7 +22,7 @@ const (
 	ErrorParse = iota + 4000
 )
 
-// Clock will run the given protocol on the roster and return
+// Clock will run the tepmlate-protocol on the roster and return
 // the time spent doing so.
 type Clock struct {
 	Roster *onet.Roster
