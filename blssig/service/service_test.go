@@ -17,7 +17,7 @@ func TestMain(m *testing.M) {
 
 func TestServiceBLSCosi(t *testing.T) {
 
-	log.SetDebugVisible(1)
+	//log.SetDebugVisible(1)
 
 	local := onet.NewTCPTest(tSuite)
 	// generate 5 hosts, they don't connect, they process messages, and they
@@ -35,11 +35,12 @@ func TestServiceBLSCosi(t *testing.T) {
 
 	for _, dst := range el.List {
 		reply := &SignatureResponse{}
-		log.Lvl1("Sending request to service...")
+		log.Lvl2("Sending request to service...")
 		err := client.SendProtobuf(dst, serviceReq, reply)
 		require.Nil(t, err, "Couldn't send")
 		require.NotNil(t, reply.Signature, "No response")
-		log.Lvl1(reply.Signature)
+		log.Print("Signature: ")
+		log.Print(reply.Signature)
 	}
 }
 

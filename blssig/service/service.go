@@ -20,7 +20,7 @@ import (
 const ServiceName = "BLSCoSiService"
 
 func init() {
-	log.Lvl1("Service: init")
+	log.Lvl3("Service: init")
 	onet.RegisterNewService(ServiceName, newBLSCoSiService)
 	network.RegisterMessage(&SignatureRequest{})
 	network.RegisterMessage(&SignatureResponse{})
@@ -44,7 +44,7 @@ type SignatureResponse struct {
 
 // SignatureRequest treats external request to this service.
 func (blscosiservice *BLSCoSiService) SignatureRequest(req *SignatureRequest) (network.Message, error) {
-	log.Lvl1("Service: SignatureRequest")
+	log.Lvl3("Service: SignatureRequest")
 	if req.Roster.ID.IsNil() {
 		req.Roster.ID = onet.RosterID(uuid.NewV4())
 	}
@@ -67,7 +67,7 @@ func (blscosiservice *BLSCoSiService) SignatureRequest(req *SignatureRequest) (n
 	protocolInstance.Message = req.Message
 	protocolInstance.Start()
 
-	log.Lvl1("BLSCosi Service starting up root protocol")
+	log.Lvl3("BLSCosi Service starting up root protocol")
 	go pi.Dispatch()
 	go pi.Start()
 
@@ -78,13 +78,13 @@ func (blscosiservice *BLSCoSiService) SignatureRequest(req *SignatureRequest) (n
 // the one starting the protocol) so it's the Service that will be called to
 // generate the PI on all others node.
 func (blscosiservice *BLSCoSiService) NewProtocol(tn *onet.TreeNodeInstance, conf *onet.GenericConfig) (onet.ProtocolInstance, error) {
-	log.Lvl1("Service: NewProtocol")
+	log.Lvl3("Service: NewProtocol")
 	pi, err := protocol.NewDefaultProtocol(tn)
 	return pi, err
 }
 
 func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
-	log.Lvl1("Service: newBLSCoSiService")
+	log.Lvl3("Service: newBLSCoSiService")
 	s := &BLSCoSiService{
 		ServiceProcessor: onet.NewServiceProcessor(c),
 	}
