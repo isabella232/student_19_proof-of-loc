@@ -4,11 +4,8 @@ package service
 
 import (
 	"errors"
-	"fmt"
-	"time"
 
 	"github.com/dedis/student_19_proof-of-loc/blssig/protocol"
-	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
@@ -23,6 +20,7 @@ import (
 const ServiceName = "BLSCoSiService"
 
 func init() {
+	log.Lvl1("Service: init")
 	onet.RegisterNewService(ServiceName, newBLSCoSiService)
 	network.RegisterMessage(&SignatureRequest{})
 	network.RegisterMessage(&SignatureResponse{})
@@ -41,17 +39,12 @@ type SignatureRequest struct {
 
 // SignatureResponse is what the BLSCosi service will reply to clients.
 type SignatureResponse struct {
-	Hash      []byte
 	Signature []byte
 }
 
 // SignatureRequest treats external request to this service.
 func (blscosiservice *BLSCoSiService) SignatureRequest(req *SignatureRequest) (network.Message, error) {
-	suite, ok := blscosiservice.Suite().(kyber.HashFactory)
-	if !ok {
-		return nil, errors.New("suite is unusable")
-	}
-
+	log.Lvl1("Service: SignatureRequest")
 	if req.Roster.ID.IsNil() {
 		req.Roster.ID = onet.RosterID(uuid.NewV4())
 	}
@@ -74,32 +67,24 @@ func (blscosiservice *BLSCoSiService) SignatureRequest(req *SignatureRequest) (n
 	protocolInstance.Message = req.Message
 	protocolInstance.Start()
 
-	h := suite.Hash()
-	h.Write(req.Message)
-
-	log.Lvl3("BLSCosi Service starting up root protocol")
+	log.Lvl1("BLSCosi Service starting up root protocol")
 	go pi.Dispatch()
 	go pi.Start()
 
-	if log.DebugVisible() > 1 {
-		fmt.Printf("%s: Signed a message.\n", time.Now().Format("Mon Jan 2 15:04:05 -0700 MST 2006"))
-	}
-	return &SignatureResponse{
-		Hash:      h.Sum(nil),
-		Signature: <-protocolInstance.FinalSignature,
-	}, nil
+	return &SignatureResponse{Signature: <-protocolInstance.FinalSignature}, nil
 }
 
 // NewProtocol is called on all nodes of a Tree (except the root, since it is
 // the one starting the protocol) so it's the Service that will be called to
 // generate the PI on all others node.
 func (blscosiservice *BLSCoSiService) NewProtocol(tn *onet.TreeNodeInstance, conf *onet.GenericConfig) (onet.ProtocolInstance, error) {
-	log.Lvl3("BLSCoSiService received New Protocol event")
+	log.Lvl1("Service: NewProtocol")
 	pi, err := protocol.NewDefaultProtocol(tn)
 	return pi, err
 }
 
 func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
+	log.Lvl1("Service: newBLSCoSiService")
 	s := &BLSCoSiService{
 		ServiceProcessor: onet.NewServiceProcessor(c),
 	}
