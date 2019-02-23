@@ -1,133 +1,111 @@
+// Package service implements a BLSCoSi service for which clients can connect to
+// and then sign messages.
 package service
-
-/*
-The service.go defines what to do for each API-call. This part of the service
-runs on the node.
-*/
 
 import (
 	"errors"
-	"sync"
+	"fmt"
+	"time"
 
-	proofofloc "github.com/dedis/student_19_proof-of-loc/blssig"
 	"github.com/dedis/student_19_proof-of-loc/blssig/protocol"
-
+	"go.dedis.ch/kyber/v3"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
+	uuid "gopkg.in/satori/go.uuid.v1"
 )
 
-// BLSCoSiServiceID is the Service is used for tests
-var BLSCoSiServiceID onet.ServiceID
+// This file contains all the code to run a BLSCoSi service. It is used to reply to
+// client request for signing something using BLSCoSiService.
+// This is an updated version of the CoSi Service (dedis/cothority/cosi/service), which only does simple signing
+
+// ServiceName is the name to refer to BLSCoSiService
+const ServiceName = "BLSCoSiService"
 
 func init() {
-	var err error
-	BLSCoSiServiceID, err = onet.RegisterNewService(proofofloc.ServiceName, newService)
-	log.ErrFatal(err)
-	network.RegisterMessage(&storage{})
+	onet.RegisterNewService(ServiceName, newBLSCoSiService)
+	network.RegisterMessage(&SignatureRequest{})
+	network.RegisterMessage(&SignatureResponse{})
 }
 
-// SimpleBLSCoSiService is our Service
-type SimpleBLSCoSiService struct {
-	// We need to embed the ServiceProcessor, so that incoming messages
-	// are correctly handled.
+// BLSCoSiService is the service that handles collective signing operations
+type BLSCoSiService struct {
 	*onet.ServiceProcessor
-
-	storage *storage
 }
 
-// storageID reflects the data we're storing - we could store more
-// than one structure.
-var storageID = []byte("main")
-
-// storage is used to save our data.
-type storage struct {
-	Signed []byte
-	sync.Mutex
+// SignatureRequest is what the BLSCosi service is expected to receive from clients.
+type SignatureRequest struct {
+	Message []byte
+	Roster  *onet.Roster
 }
 
-// Sign returns the messaged signed by the instantiations of the protocol.
-func (s *SimpleBLSCoSiService) Sign(req *proofofloc.Signed) (*proofofloc.SignedReply, error) {
+// SignatureResponse is what the BLSCosi service will reply to clients.
+type SignatureResponse struct {
+	Hash      []byte
+	Signature []byte
+}
 
-	tree := req.Roster.GenerateNaryTreeWithRoot(2, s.ServerIdentity())
-	if tree == nil {
-		return nil, errors.New("couldn't create tree")
+// SignatureRequest treats external request to this service.
+func (blscosiservice *BLSCoSiService) SignatureRequest(req *SignatureRequest) (network.Message, error) {
+	suite, ok := blscosiservice.Suite().(kyber.HashFactory)
+	if !ok {
+		return nil, errors.New("suite is unusable")
 	}
 
-	//Start protocol
-	p, err := s.CreateProtocol(protocol.Name, tree)
+	if req.Roster.ID.IsNil() {
+		req.Roster.ID = onet.RosterID(uuid.NewV4())
+	}
+
+	_, root := req.Roster.Search(blscosiservice.ServerIdentity().ID)
+	if root == nil {
+		return nil, errors.New("Couldn't find a serverIdentity in Roster")
+	}
+
+	tree := req.Roster.GenerateNaryTreeWithRoot(2, root)
+	tni := blscosiservice.NewTreeNodeInstance(tree, tree.Root, protocol.Name)
+	pi, err := protocol.NewDefaultProtocol(tni)
 	if err != nil {
-		return nil, err
-
+		return nil, errors.New("Couldn't make new protocol: " + err.Error())
 	}
+	blscosiservice.RegisterProtocolInstance(pi)
 
-	// Register the function generating the protocol instance
-	var root *protocol.SimpleBLSCoSi
+	//Set message and start signing
+	protocolInstance := pi.(*protocol.SimpleBLSCoSi)
+	protocolInstance.Message = req.Message
+	protocolInstance.Start()
 
-	root = p.(*protocol.SimpleBLSCoSi)
-	root.Message = req.ToSign
+	h := suite.Hash()
+	h.Write(req.Message)
 
-	p.Start()
+	log.Lvl3("BLSCosi Service starting up root protocol")
+	go pi.Dispatch()
+	go pi.Start()
 
-	resp := &proofofloc.SignedReply{
-		Signed: <-p.(*protocol.SimpleBLSCoSi).FinalSignature,
+	if log.DebugVisible() > 1 {
+		fmt.Printf("%s: Signed a message.\n", time.Now().Format("Mon Jan 2 15:04:05 -0700 MST 2006"))
 	}
-
-	return resp, nil
+	return &SignatureResponse{
+		Hash:      h.Sum(nil),
+		Signature: <-protocolInstance.FinalSignature,
+	}, nil
 }
 
 // NewProtocol is called on all nodes of a Tree (except the root, since it is
 // the one starting the protocol) so it's the Service that will be called to
 // generate the PI on all others node.
-// If you use CreateProtocolOnet, this will not be called, as the Onet will
-// instantiate the protocol on its own. If you need more control at the
-// instantiation of the protocol, use CreateProtocolService, and you can
-// give some extra-configuration to your protocol in here.
-func (s *SimpleBLSCoSiService) NewProtocol(tn *onet.TreeNodeInstance, conf *onet.GenericConfig) (onet.ProtocolInstance, error) {
-	return nil, nil
+func (blscosiservice *BLSCoSiService) NewProtocol(tn *onet.TreeNodeInstance, conf *onet.GenericConfig) (onet.ProtocolInstance, error) {
+	log.Lvl3("BLSCoSiService received New Protocol event")
+	pi, err := protocol.NewDefaultProtocol(tn)
+	return pi, err
 }
 
-// saves all data.
-func (s *SimpleBLSCoSiService) save() {
-	s.storage.Lock()
-	defer s.storage.Unlock()
-	err := s.Save(storageID, s.storage)
-	if err != nil {
-		log.Error("Couldn't save data:", err)
-	}
-}
-
-// Tries to load the configuration and updates the data in the service
-// if it finds a valid config-file.
-func (s *SimpleBLSCoSiService) tryLoad() error {
-	s.storage = &storage{}
-	msg, err := s.Load(storageID)
-	if err != nil {
-		return err
-	}
-	if msg == nil {
-		return nil
-	}
-	var ok bool
-	s.storage, ok = msg.(*storage)
-	if !ok {
-		return errors.New("Data of wrong type")
-	}
-	return nil
-}
-
-// newService receives the context that holds information about the node it's
-// running on. Saving and loading can be done using the context. The data will
-// be stored in memory for tests and simulations, and on disk for real deployments.
-func newService(c *onet.Context) (onet.Service, error) {
-	s := &SimpleBLSCoSiService{
+func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
+	s := &BLSCoSiService{
 		ServiceProcessor: onet.NewServiceProcessor(c),
 	}
-	if err := s.RegisterHandlers(s.Sign); err != nil {
-		return nil, errors.New("Couldn't register messages")
-	}
-	if err := s.tryLoad(); err != nil {
-		log.Error(err)
+	err := s.RegisterHandler(s.SignatureRequest)
+	if err != nil {
+		log.Error(err, "Couldn't register message:")
 		return nil, err
 	}
 	return s, nil

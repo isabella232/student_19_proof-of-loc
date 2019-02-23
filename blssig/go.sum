@@ -14,6 +14,7 @@ github.com/dedis/cothority_template v0.0.0-20190213155047-1f446a5dec24 h1:p80Aet
 github.com/dedis/cothority_template v0.0.0-20190213155047-1f446a5dec24/go.mod h1:DiRDU73q6mA4IAeeKdNWY9yUMMiL1BYpfwaQSoNFiiY=
 github.com/dedis/student_19_proof-of-loc v0.0.0-20190220135024-cb35ce91527c h1:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
 github.com/dedis/student_19_proof-of-loc v0.0.0-20190222095930-08364b26f9fe h1:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
+github.com/dedis/student_19_proof-of-loc v0.0.0-20190223112214-5100ab543a19 h1:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450/go.mod h1:Bk6SMAONeMXrxql8uvOKuAZSu8aM5RUGv+1C6IJaEho=
 github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995/go.mod h1:lJgMEyOkYFkPcDKwRXegd+iM6E7matEszMG5HhwytU8=
