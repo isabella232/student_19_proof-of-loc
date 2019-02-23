@@ -10,8 +10,6 @@ import (
 	"go.dedis.ch/onet/v3/log"
 )
 
-const protoName = "testService"
-
 var testSuite = pairing.NewSuiteBn256()
 
 func TestMain(m *testing.M) {
@@ -26,7 +24,7 @@ func TestService_Sign(t *testing.T) {
 	defer local.CloseAll()
 
 	message := []byte("Message")
-	services := local.GetServices(hosts, testID)
+	services := local.GetServices(hosts, BLSCoSiServiceID)
 
 	for _, s := range services {
 		log.Lvl2("Sending request to", s)

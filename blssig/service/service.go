@@ -17,12 +17,12 @@ import (
 	"go.dedis.ch/onet/v3/network"
 )
 
-// Used for tests
-var testID onet.ServiceID
+// BLSCoSiServiceID is the Service is used for tests
+var BLSCoSiServiceID onet.ServiceID
 
 func init() {
 	var err error
-	testID, err = onet.RegisterNewService(proofofloc.ServiceName, newService)
+	BLSCoSiServiceID, err = onet.RegisterNewService(proofofloc.ServiceName, newService)
 	log.ErrFatal(err)
 	network.RegisterMessage(&storage{})
 }
@@ -58,6 +58,7 @@ func (s *SimpleBLSCoSiService) Sign(req *proofofloc.Signed) (*proofofloc.SignedR
 	p, err := s.CreateProtocol(protocol.Name, tree)
 	if err != nil {
 		return nil, err
+
 	}
 
 	// Register the function generating the protocol instance
