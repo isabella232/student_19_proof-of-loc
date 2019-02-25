@@ -26,15 +26,15 @@ func init() {
 	onet.RegisterNewService(ServiceName, newBLSCoSiService)
 	network.RegisterMessage(&SignatureRequest{})
 	network.RegisterMessage(&SignatureResponse{})
+	network.RegisterMessage(&PropagationFunction{})
 }
 
 // BLSCoSiService is the service that handles collective signing operations
 type BLSCoSiService struct {
 	*onet.ServiceProcessor
-	propagateGenesis     messaging.PropagationFunc
-	propagateForwardLink messaging.PropagationFunc
-	propagateProof       messaging.PropagationFunc
-	propTimeout          time.Duration
+	propagationFunction messaging.PropagationFunc
+	propTimeout         time.Duration
+	propagatedSignature []byte
 }
 
 // SignatureRequest is what the BLSCosi service is expected to receive from clients.
@@ -48,25 +48,30 @@ type SignatureResponse struct {
 	Signature []byte
 }
 
+// PropagationFunction sends the complete signature to all members of the Cothority
+type PropagationFunction struct {
+	Signature []byte
+}
+
 // SignatureRequest treats external request to this service.
-func (blscosiservice *BLSCoSiService) SignatureRequest(req *SignatureRequest) (network.Message, error) {
+func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (network.Message, error) {
 	log.Lvl3("Service: SignatureRequest")
 	if req.Roster.ID.IsNil() {
 		req.Roster.ID = onet.RosterID(uuid.NewV4())
 	}
 
-	_, root := req.Roster.Search(blscosiservice.ServerIdentity().ID)
+	_, root := req.Roster.Search(s.ServerIdentity().ID)
 	if root == nil {
 		return nil, errors.New("Couldn't find a serverIdentity in Roster")
 	}
 
 	tree := req.Roster.GenerateNaryTreeWithRoot(2, root)
-	tni := blscosiservice.NewTreeNodeInstance(tree, tree.Root, protocol.Name)
+	tni := s.NewTreeNodeInstance(tree, tree.Root, protocol.Name)
 	pi, err := protocol.NewDefaultProtocol(tni)
 	if err != nil {
 		return nil, errors.New("Couldn't make new protocol: " + err.Error())
 	}
-	blscosiservice.RegisterProtocolInstance(pi)
+	s.RegisterProtocolInstance(pi)
 
 	//Set message and start signing
 	protocolInstance := pi.(*protocol.SimpleBLSCoSi)
@@ -83,6 +88,13 @@ func (blscosiservice *BLSCoSiService) SignatureRequest(req *SignatureRequest) (n
 	}
 
 	sig := <-protocolInstance.FinalSignature
+
+	// We propagate the signature to all nodes
+	err = s.startPropagation(s.propagationFunction, req.Roster, &PropagationFunction{sig})
+	if err != nil {
+		return nil, err
+	}
+
 	return &SignatureResponse{sig}, nil
 
 }
@@ -90,7 +102,7 @@ func (blscosiservice *BLSCoSiService) SignatureRequest(req *SignatureRequest) (n
 // NewProtocol is called on all nodes of a Tree (except the root, since it is
 // the one starting the protocol) so it's the Service that will be called to
 // generate the PI on all others node.
-func (blscosiservice *BLSCoSiService) NewProtocol(tn *onet.TreeNodeInstance, conf *onet.GenericConfig) (onet.ProtocolInstance, error) {
+func (s *BLSCoSiService) NewProtocol(tn *onet.TreeNodeInstance, conf *onet.GenericConfig) (onet.ProtocolInstance, error) {
 	log.Lvl3("Service: NewProtocol")
 	pi, err := protocol.NewDefaultProtocol(tn)
 	return pi, err
@@ -106,5 +118,36 @@ func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
 		log.Error(err, "Couldn't register message:")
 		return nil, err
 	}
+
+	s.propagationFunction, err = messaging.NewPropagationFunc(c, protocol.Name, s.propagateFuncHandler, -1)
+	if err != nil {
+		return nil, err
+	}
+
 	return s, nil
+}
+
+// SetPropTimeout is used to set the propagation timeout.
+func (s *BLSCoSiService) SetPropTimeout(t time.Duration) {
+	s.propTimeout = t
+}
+
+func (s *BLSCoSiService) startPropagation(propagate messaging.PropagationFunc, ro *onet.Roster, msg network.Message) error {
+
+	replies, err := propagate(ro, msg, s.propTimeout)
+	if err != nil {
+		return err
+	}
+
+	if replies != len(ro.List) {
+		log.Lvl1(s.ServerIdentity(), "Only got", replies, "out of", len(ro.List))
+	}
+
+	return nil
+}
+
+// propagateForwardLinkHandler will update the latest block with
+// the new forward link and the new block when given
+func (s *BLSCoSiService) propagateFuncHandler(msg network.Message) {
+	s.propagatedSignature = msg.(*PropagationFunction).Signature
 }
