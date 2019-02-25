@@ -4,8 +4,10 @@ package service
 
 import (
 	"errors"
+	"time"
 
 	"github.com/dedis/student_19_proof-of-loc/blssig/protocol"
+	"go.dedis.ch/cothority/v3/messaging"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
@@ -29,6 +31,10 @@ func init() {
 // BLSCoSiService is the service that handles collective signing operations
 type BLSCoSiService struct {
 	*onet.ServiceProcessor
+	propagateGenesis     messaging.PropagationFunc
+	propagateForwardLink messaging.PropagationFunc
+	propagateProof       messaging.PropagationFunc
+	propTimeout          time.Duration
 }
 
 // SignatureRequest is what the BLSCosi service is expected to receive from clients.
@@ -65,13 +71,20 @@ func (blscosiservice *BLSCoSiService) SignatureRequest(req *SignatureRequest) (n
 	//Set message and start signing
 	protocolInstance := pi.(*protocol.SimpleBLSCoSi)
 	protocolInstance.Message = req.Message
-	protocolInstance.Start()
 
 	log.Lvl3("BLSCosi Service starting up root protocol")
-	go pi.Dispatch()
-	go pi.Start()
 
-	return &SignatureResponse{Signature: <-protocolInstance.FinalSignature}, nil
+	// start the protocol
+	log.Lvl3("Cosi Service starting up root protocol")
+	go pi.Dispatch()
+
+	if err = pi.Start(); err != nil {
+		return nil, err
+	}
+
+	sig := <-protocolInstance.FinalSignature
+	return &SignatureResponse{sig}, nil
+
 }
 
 // NewProtocol is called on all nodes of a Tree (except the root, since it is
