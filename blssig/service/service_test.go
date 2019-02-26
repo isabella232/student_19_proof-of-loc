@@ -17,12 +17,12 @@ func TestMain(m *testing.M) {
 
 func TestServiceBLSCosi(t *testing.T) {
 
-	//log.SetDebugVisible(1)
+	log.SetDebugVisible(1)
 
 	local := onet.NewTCPTest(tSuite)
 	// generate 5 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
-	_, el, _ := local.GenTree(5, false)
+	_, el, _ := local.GenTree(2, false)
 	defer local.CloseAll()
 
 	// Send a request to the service to all hosts
@@ -39,8 +39,8 @@ func TestServiceBLSCosi(t *testing.T) {
 		err := client.SendProtobuf(dst, serviceReq, reply)
 		require.Nil(t, err, "Couldn't send")
 		require.NotNil(t, reply.Signature, "No response")
-		log.Print("Signature: ")
-		log.Print(reply.Signature)
+		//log.Print("Signature: ")
+		//log.Print(reply.Signature)
 	}
 }
 
@@ -71,4 +71,5 @@ func TestCreateAggregate(t *testing.T) {
 	require.Nil(t, err, "Couldn't send")
 	require.NotNil(t, res, "No response")
 	require.NotNil(t, res.Signature, "No response signature")
+	require.NotNil(t, res.Propagated, "No propagated signature")
 }
