@@ -1,11 +1,10 @@
 package proofofloc
 
 import (
-	"container/list"
-	"crypto/rsa"
+	"go.dedis.ch/kyber/v3"
+	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3/network"
 	"math/rand"
-	"net"
 	"time"
 )
 
@@ -22,16 +21,36 @@ In your design though, you can already take such an extension into account.
 
 */
 
-// ValidatorID represents a validator's unique identification
-type ValidatorID struct {
-	IP        network.Address
+type nonce int
+
+type pingcontrol struct {
+	nonce      nonce
+	returntime time.Time
+}
+
+type pingmsg struct {
 	PublicKey kyber.Point
-	Pings     list.List
+	Control   pingcontrol
+}
+
+type pongmsg struct {
+	PublicKey kyber.Point
+	Control   pingcontrol
+}
+
+var suite = pairing.NewSuiteBn256()
+
+// Validator represents a validator with unique identification
+type Validator struct {
+	Address   string
+	PublicKey kyber.Point
+	Pings     map[kyber.Point]pingcontrol
+	Listener  *network.TCPListener
 }
 
 // Block represents a block structure in a chain, containing validator identification
 type Block struct {
-	ValidatorID   ValidatorID
+	Validator     Validator
 	NextBlock     *Block
 	PreviousBlock *Block
 }
@@ -42,16 +61,75 @@ type Chain struct {
 	LastBlock  *Block
 }
 
-/*
- Using the ping function, a node can ping a chosen node.
-*/
-func (a ValidatorID) ping(b ValidatorID) {
-	delay := rand.Int(20, 300)
+//Ping allows a validator node to ping another node
+func (v Validator) Ping(b Validator) {
+	delay := time.Duration((rand.Intn(300-20) + 20)) * time.Millisecond
 
-	dest := network.ServerIdentity{
-		b.PublicKey, b.IP,
+	dst := network.NewTCPAddress(b.Address)
+
+	conn, err := network.NewTCPConn(dst, suite)
+
+	if err != nil {
+		return
 	}
 
-	a.Pings.PushBack(b)
+	control := pingcontrol{nonce(rand.Int()), time.Now().Add(delay)}
+
+	_, err1 := conn.Send(pingmsg{v.PublicKey, control})
+
+	if err1 != nil {
+		return
+	}
+
+	conn.Close()
+
+	if err1 != nil {
+		return
+	}
+
+	v.Pings[b.PublicKey] = control
+
+}
+
+//PingListen listens for pings and pongs from other validators and handles them accordingly
+func (v Validator) PingListen(c network.Conn) {
+
+	env, err := c.Receive()
+
+	if err != nil {
+		return
+	}
+
+	PingReceived, isPing := env.Msg.(pingmsg)
+	PongReceived, isPong := env.Msg.(pongmsg)
+
+	if isPing {
+		c.Send(pongmsg{v.PublicKey, PingReceived.Control})
+	} else {
+		if isPong && v.Pings[PongReceived.PublicKey].nonce == PongReceived.Control.nonce {
+
+			if PongReceived.Control.returntime.Before(time.Now()) {
+				// what here?
+			} else {
+				//what here?
+				delete(v.Pings, PongReceived.PublicKey)
+			}
+		}
+	}
+
+	c.Close()
+
+}
+
+func newValidator(Address string, PublicKey kyber.Point) (*Validator, error) {
+	listener, err := network.NewTCPListener(network.NewTCPAddress(Address), suite)
+	if err != nil {
+		return nil, err
+	}
+	newVal := &Validator{Address, PublicKey, make(map[kyber.Point]pingcontrol), listener}
+
+	listener.Listen(newVal.PingListen)
+
+	return newVal, nil
 
 }
