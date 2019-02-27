@@ -15,9 +15,8 @@ func TestMain(m *testing.M) {
 	log.MainTest(m)
 }
 
+//Note: this test arbitrarily passes or fails -> needs to be adapted
 func TestServiceBLSCosi(t *testing.T) {
-
-	log.SetDebugVisible(1)
 
 	local := onet.NewTCPTest(tSuite)
 	// generate 5 hosts, they don't connect, they process messages, and they
@@ -38,13 +37,12 @@ func TestServiceBLSCosi(t *testing.T) {
 		log.Lvl2("Sending request to service...")
 		err := client.SendProtobuf(dst, serviceReq, reply)
 		require.Nil(t, err, "Couldn't send")
-		require.NotNil(t, reply.Signature, "No response")
-		//log.Print("Signature: ")
-		//log.Print(reply.Signature)
+		require.NotEmpty(t, reply.Signature, "No signature")
 	}
 }
 
-func TestCreateAggregate(t *testing.T) {
+//Note: this test arbitrarily passes or fails -> needs to be adapted
+func TestApi(t *testing.T) {
 
 	//log.SetDebugVisible(1)
 	local := onet.NewTCPTest(tSuite)
@@ -56,8 +54,7 @@ func TestCreateAggregate(t *testing.T) {
 
 	// Send a request to the service
 	client := NewClient()
-	msg := []byte("hello cosi service")
-	log.Lvl1("Sending request to service...")
+	msg := []byte("hello blscosi service")
 
 	el1 := &onet.Roster{}
 	_, err := client.SignatureRequest(el1, msg)
@@ -70,6 +67,5 @@ func TestCreateAggregate(t *testing.T) {
 
 	require.Nil(t, err, "Couldn't send")
 	require.NotNil(t, res, "No response")
-	require.NotNil(t, res.Signature, "No response signature")
-	require.NotNil(t, res.Propagated, "No propagated signature")
+	require.NotEmpty(t, res.Signature, "No response signature")
 }

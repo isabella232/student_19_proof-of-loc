@@ -1,5 +1,4 @@
-// Package service implements a BLSCoSi service for which clients can connect to
-// and then sign messages.
+// Package service implements a BLSCoSi service for which clients can connect to and then sign messages.
 package service
 
 import (
@@ -22,7 +21,6 @@ import (
 const ServiceName = "BLSCoSiService"
 
 func init() {
-	log.Lvl3("Service: init")
 	onet.RegisterNewService(ServiceName, newBLSCoSiService)
 	network.RegisterMessage(&SignatureRequest{})
 	network.RegisterMessage(&SignatureResponse{})
@@ -54,9 +52,8 @@ type PropagationFunction struct {
 	Signature []byte
 }
 
-// SignatureRequest treats external request to this service.
+// SignatureRequest treats external requests to this service.
 func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (network.Message, error) {
-	log.Lvl3("Service: SignatureRequest")
 	if req.Roster.ID.IsNil() {
 		req.Roster.ID = onet.RosterID(uuid.NewV4())
 	}
@@ -81,18 +78,19 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (network.Messag
 	log.Lvl3("BLSCosi Service starting up root protocol")
 
 	// start the protocol
-	log.Lvl3("Cosi Service starting up root protocol")
 	go pi.Dispatch()
 
 	if err = pi.Start(); err != nil {
 		return nil, err
 	}
 
+	//Get signature
 	sig := <-protocolInstance.FinalSignature
 
 	// We propagate the signature to all nodes
 	err = s.startPropagation(s.propagationFunction, req.Roster, &PropagationFunction{sig})
 	if err != nil {
+		log.Error(err, "Couldn't propagate signature:")
 		return nil, err
 	}
 
@@ -106,24 +104,23 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (network.Messag
 // the one starting the protocol) so it's the Service that will be called to
 // generate the PI on all others node.
 func (s *BLSCoSiService) NewProtocol(tn *onet.TreeNodeInstance, conf *onet.GenericConfig) (onet.ProtocolInstance, error) {
-	log.Lvl3("Service: NewProtocol")
 	pi, err := protocol.NewDefaultProtocol(tn)
 	return pi, err
 }
 
 func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
-	log.Lvl3("Service: newBLSCoSiService")
 	s := &BLSCoSiService{
 		ServiceProcessor: onet.NewServiceProcessor(c),
 	}
 	err := s.RegisterHandler(s.SignatureRequest)
 	if err != nil {
-		log.Error(err, "Couldn't register message:")
+		log.Error(err, "Couldn't register handler:")
 		return nil, err
 	}
 
-	s.propagationFunction, err = messaging.NewPropagationFunc(c, "propagateSignature", s.propagateFuncHandler, -1)
+	s.propagationFunction, err = messaging.NewPropagationFunc(c, "propagateBLSCoSiSignature", s.propagateFuncHandler, -1)
 	if err != nil {
+		log.Error(err, "Couldn't create propagation function:")
 		return nil, err
 	}
 
@@ -135,10 +132,12 @@ func (s *BLSCoSiService) SetPropTimeout(t time.Duration) {
 	s.propTimeout = t
 }
 
+//startPropagation propagates the final signature to all the other nodes
 func (s *BLSCoSiService) startPropagation(propagate messaging.PropagationFunc, ro *onet.Roster, msg network.Message) error {
 
 	replies, err := propagate(ro, msg, s.propTimeout)
 	if err != nil {
+		log.Error(err, "Couldn't propagate signature:")
 		return err
 	}
 
@@ -149,8 +148,7 @@ func (s *BLSCoSiService) startPropagation(propagate messaging.PropagationFunc, r
 	return nil
 }
 
-// propagateForwardLinkHandler will update the latest block with
-// the new forward link and the new block when given
+// propagateForwardLinkHandler will update the propagated Signature with the latest one given to root node
 func (s *BLSCoSiService) propagateFuncHandler(msg network.Message) {
 	s.propagatedSignature = msg.(*PropagationFunction).Signature
 }

@@ -8,8 +8,7 @@ import (
 	"go.dedis.ch/onet/v3/log"
 )
 
-// Client is a structure to communicate with the BLSCoSi
-// service
+// Client is a structure to communicate with the BLSCoSi service
 type Client struct {
 	*onet.Client
 }

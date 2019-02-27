@@ -53,7 +53,6 @@ func NewProtocol(node *onet.TreeNodeInstance, vf VerificationFn, suite *pairing.
 
 // Dispatch will listen on the four channels we use (i.e. four steps)
 func (c *SimpleBLSCoSi) Dispatch() error {
-	log.Lvl3("Protocol: Starting Dispatch")
 	nbrChild := len(c.Children())
 	if !c.IsRoot() {
 		log.Lvl3(c.ServerIdentity(), "waiting for prepare")
@@ -102,7 +101,6 @@ func (c *SimpleBLSCoSi) Dispatch() error {
 // Start will call the announcement function of its inner Round structure. It
 // will pass nil as *in* message.
 func (c *SimpleBLSCoSi) Start() error {
-	log.Lvl3("Protocol: Starting Start")
 	out := &SimplePrepare{c.Message}
 	return c.handlePrepare(out)
 }
@@ -110,7 +108,6 @@ func (c *SimpleBLSCoSi) Start() error {
 // handlePrepare will pass the message to the round and send back the
 // output. If in == nil, we are root and we start the round.
 func (c *SimpleBLSCoSi) handlePrepare(in *SimplePrepare) error {
-	log.Lvl3("Protocol: Starting handlePrepare")
 	c.Message = in.Message
 	log.Lvlf3("%s prepare message: %x", c.ServerIdentity(), c.Message)
 
@@ -131,7 +128,6 @@ func (c *SimpleBLSCoSi) handlePrepare(in *SimplePrepare) error {
 // It expects *in* to be the full set of messages from the children.
 // The children's commitment must remain constants.
 func (c *SimpleBLSCoSi) handlePrepareReplies(replies []*SimplePrepareReply) error {
-	log.Lvl3("Protocol: Starting handlePrepareReplies")
 	log.Lvl3(c.ServerIdentity(), "aggregated")
 
 	// combine the signatures from the replies
@@ -165,7 +161,6 @@ func (c *SimpleBLSCoSi) handlePrepareReplies(replies []*SimplePrepareReply) erro
 // handleCommit dispatch the commit to the round and then dispatch the
 // results down the tree.
 func (c *SimpleBLSCoSi) handleCommit(in *SimpleCommit) error {
-	log.Lvl3("Protocol: Starting handleCommit")
 	log.Lvlf3("%s handling commit", c.ServerIdentity())
 
 	// check that the commit is correct with respect to the aggregate key
@@ -187,7 +182,6 @@ func (c *SimpleBLSCoSi) handleCommit(in *SimpleCommit) error {
 
 // handleCommitReplies brings up the commitReply of each node in the tree to the root.
 func (c *SimpleBLSCoSi) handleCommitReplies(replies []*SimpleCommitReply) error {
-	log.Lvl3("Protocol: Starting handleCommitReplies")
 
 	defer func() {
 		// protocol is finished
@@ -223,7 +217,6 @@ func (c *SimpleBLSCoSi) handleCommitReplies(replies []*SimpleCommitReply) error 
 }
 
 func commitRepliesToSigs(replies []*SimpleCommitReply) [][]byte {
-	log.Lvl3("Protocol: Starting commitRepliesToSigs")
 	sigs := make([][]byte, len(replies))
 	for i, reply := range replies {
 		sigs[i] = reply.Sig
@@ -232,7 +225,6 @@ func commitRepliesToSigs(replies []*SimpleCommitReply) [][]byte {
 }
 
 func prepareRepliesToSigs(replies []*SimplePrepareReply) [][]byte {
-	log.Lvl3("Protocol: Starting prepareRepliesToSigs")
 	sigs := make([][]byte, len(replies))
 	for i, reply := range replies {
 		sigs[i] = reply.Sig
