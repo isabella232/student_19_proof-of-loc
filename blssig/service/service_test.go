@@ -19,26 +19,25 @@ func TestMain(m *testing.M) {
 func TestServiceBLSCosi(t *testing.T) {
 
 	local := onet.NewTCPTest(tSuite)
-	// generate 5 hosts, they don't connect, they process messages, and they
+	// generate 3 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
-	_, el, _ := local.GenTree(2, false)
+	hosts, el, _ := local.GenTree(3, false)
 	defer local.CloseAll()
 
+	services := local.GetServices(hosts, serviceID)
+
 	// Send a request to the service to all hosts
-	client := NewClient()
 	msg := []byte("hello blscosi service")
 	serviceReq := &SignatureRequest{
 		Roster:  el,
 		Message: msg,
 	}
 
-	for _, dst := range el.List {
-		reply := &SignatureResponse{}
-		log.Lvl2("Sending request to service...")
-		err := client.SendProtobuf(dst, serviceReq, reply)
-		require.Nil(t, err, "Couldn't send")
-		require.NotEmpty(t, reply.Signature, "No signature")
-	}
+	log.Lvl2("Sending request to service...")
+	s := services[0].(*BLSCoSiService)
+	reply, err := s.SignatureRequest(serviceReq)
+	require.Nil(t, err, "Couldn't send")
+	require.NotEmpty(t, reply.Signature, "No signature")
 }
 
 //Note: this test arbitrarily passes or fails -> needs to be adapted

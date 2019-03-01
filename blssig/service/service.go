@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/dedis/student_19_proof-of-loc/blssig/protocol"
+	uuid "github.com/satori/go.uuid"
 	"go.dedis.ch/cothority/v3/messaging"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
-	uuid "gopkg.in/satori/go.uuid.v1"
 )
 
 // This file contains all the code to run a BLSCoSi service. It is used to reply to
@@ -20,8 +20,15 @@ import (
 // ServiceName is the name to refer to BLSCoSiService
 const ServiceName = "BLSCoSiService"
 
+const protoName = "blscosiproto"
+
+var serviceID onet.ServiceID
+
 func init() {
-	onet.RegisterNewService(ServiceName, newBLSCoSiService)
+	var err error
+	serviceID, err = onet.RegisterNewService(ServiceName, newBLSCoSiService)
+	log.ErrFatal(err)
+	onet.GlobalProtocolRegister(protoName, protocol.NewDefaultProtocol)
 	network.RegisterMessage(&SignatureRequest{})
 	network.RegisterMessage(&SignatureResponse{})
 	network.RegisterMessage(&PropagationFunction{})
@@ -31,7 +38,6 @@ func init() {
 type BLSCoSiService struct {
 	*onet.ServiceProcessor
 	propagationFunction messaging.PropagationFunc
-	propTimeout         time.Duration
 	propagatedSignature []byte
 }
 
@@ -43,8 +49,7 @@ type SignatureRequest struct {
 
 // SignatureResponse is what the BLSCosi service will reply to clients.
 type SignatureResponse struct {
-	Signature  []byte
-	Propagated []byte
+	Signature []byte
 }
 
 // PropagationFunction sends the complete signature to all members of the Cothority
@@ -53,7 +58,7 @@ type PropagationFunction struct {
 }
 
 // SignatureRequest treats external requests to this service.
-func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (network.Message, error) {
+func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (*SignatureResponse, error) {
 	if req.Roster.ID.IsNil() {
 		req.Roster.ID = onet.RosterID(uuid.NewV4())
 	}
@@ -64,21 +69,16 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (network.Messag
 	}
 
 	tree := req.Roster.GenerateNaryTreeWithRoot(2, root)
-	tni := s.NewTreeNodeInstance(tree, tree.Root, protocol.Name)
-	pi, err := protocol.NewDefaultProtocol(tni)
+	pi, err := s.CreateProtocol(protoName, tree)
 	if err != nil {
 		return nil, errors.New("Couldn't make new protocol: " + err.Error())
 	}
-	s.RegisterProtocolInstance(pi)
 
 	//Set message and start signing
 	protocolInstance := pi.(*protocol.SimpleBLSCoSi)
 	protocolInstance.Message = req.Message
 
 	log.Lvl3("BLSCosi Service starting up root protocol")
-
-	// start the protocol
-	go pi.Dispatch()
 
 	if err = pi.Start(); err != nil {
 		return nil, err
@@ -94,18 +94,8 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (network.Messag
 		return nil, err
 	}
 
-	propagated := s.propagatedSignature
+	return &SignatureResponse{sig}, nil
 
-	return &SignatureResponse{sig, propagated}, nil
-
-}
-
-// NewProtocol is called on all nodes of a Tree (except the root, since it is
-// the one starting the protocol) so it's the Service that will be called to
-// generate the PI on all others node.
-func (s *BLSCoSiService) NewProtocol(tn *onet.TreeNodeInstance, conf *onet.GenericConfig) (onet.ProtocolInstance, error) {
-	pi, err := protocol.NewDefaultProtocol(tn)
-	return pi, err
 }
 
 func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
@@ -127,15 +117,10 @@ func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
 	return s, nil
 }
 
-// SetPropTimeout is used to set the propagation timeout.
-func (s *BLSCoSiService) SetPropTimeout(t time.Duration) {
-	s.propTimeout = t
-}
-
 //startPropagation propagates the final signature to all the other nodes
 func (s *BLSCoSiService) startPropagation(propagate messaging.PropagationFunc, ro *onet.Roster, msg network.Message) error {
 
-	replies, err := propagate(ro, msg, s.propTimeout)
+	replies, err := propagate(ro, msg, 10*time.Second)
 	if err != nil {
 		log.Error(err, "Couldn't propagate signature:")
 		return err
@@ -149,6 +134,7 @@ func (s *BLSCoSiService) startPropagation(propagate messaging.PropagationFunc, r
 }
 
 // propagateForwardLinkHandler will update the propagated Signature with the latest one given to root node
-func (s *BLSCoSiService) propagateFuncHandler(msg network.Message) {
+func (s *BLSCoSiService) propagateFuncHandler(msg network.Message) error {
 	s.propagatedSignature = msg.(*PropagationFunction).Signature
+	return nil
 }

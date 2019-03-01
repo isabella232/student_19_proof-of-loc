@@ -5,9 +5,6 @@ import (
 	"go.dedis.ch/onet/v3/network"
 )
 
-// Name can be used from other packages to refer to this protocol.
-const Name = "SimpleBlsCoSi"
-
 func init() {
 	network.RegisterMessages(&SimplePrepare{}, &SimplePrepareReply{}, &SimpleCommit{}, &SimpleCommitReply{})
 }
