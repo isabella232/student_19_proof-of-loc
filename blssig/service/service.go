@@ -112,6 +112,8 @@ func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
 	s := &BLSCoSiService{
 		ServiceProcessor: onet.NewServiceProcessor(c),
 	}
+
+	s.propTimeout = time.Second
 	err := s.RegisterHandler(s.SignatureRequest)
 	if err != nil {
 		log.Error(err, "Couldn't register handler:")

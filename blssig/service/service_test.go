@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v3/pairing"
+	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 )
@@ -22,7 +23,8 @@ func TestServiceBLSCosi(t *testing.T) {
 	// generate 5 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
 	_, el, _ := local.GenTree(2, false)
-	defer local.CloseAll()
+
+	aggregatePublicKey := bls.AggregatePublicKeys(tSuite, el.Publics()...)
 
 	// Send a request to the service to all hosts
 	client := NewClient()
@@ -38,19 +40,25 @@ func TestServiceBLSCosi(t *testing.T) {
 		err := client.SendProtobuf(dst, serviceReq, reply)
 		require.Nil(t, err, "Couldn't send")
 		require.NotEmpty(t, reply.Signature, "No signature")
+
+		err2 := bls.Verify(tSuite, aggregatePublicKey, msg, reply.Signature)
+		require.Nil(t, err2, "Signature incorrect")
 	}
+
+	local.CloseAll()
 }
 
 //Note: this test arbitrarily passes or fails -> needs to be adapted
 func TestApi(t *testing.T) {
 
-	//log.SetDebugVisible(1)
+	log.SetDebugVisible(3)
 	local := onet.NewTCPTest(tSuite)
 	// generate 5 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
 
 	_, el, _ := local.GenTree(5, false)
-	defer local.CloseAll()
+
+	aggregatePublicKey := bls.AggregatePublicKeys(tSuite, el.Publics()...)
 
 	// Send a request to the service
 	client := NewClient()
@@ -68,4 +76,10 @@ func TestApi(t *testing.T) {
 	require.Nil(t, err, "Couldn't send")
 	require.NotNil(t, res, "No response")
 	require.NotEmpty(t, res.Signature, "No response signature")
+
+	err2 := bls.Verify(tSuite, aggregatePublicKey, msg, res.Signature)
+
+	require.Nil(t, err2, "Signature incorrect")
+
+	local.CloseAll()
 }
