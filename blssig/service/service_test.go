@@ -19,6 +19,8 @@ func TestMain(m *testing.M) {
 //Note: this test arbitrarily passes or fails -> needs to be adapted
 func TestServiceBLSCosi(t *testing.T) {
 
+	var err error
+
 	local := onet.NewTCPTest(tSuite)
 	// generate 3 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
@@ -42,12 +44,18 @@ func TestServiceBLSCosi(t *testing.T) {
 	require.Nil(t, err, "Couldn't send")
 	require.NotEmpty(t, reply.Signature, "No signature")
 
-	err2 := bls.Verify(tSuite, aggregatePublicKey, msg, reply.Signature)
-	require.Nil(t, err2, "Signature incorrect")
+	err = bls.Verify(tSuite, aggregatePublicKey, msg, reply.Signature)
+	require.Nil(t, err, "Signature incorrect")
+
+	err = bls.Verify(tSuite, aggregatePublicKey, msg, reply.Propagated)
+	require.Nil(t, err, "Propagated incorrect")
+
 }
 
 //Note: this test arbitrarily passes or fails -> needs to be adapted
 func TestApi(t *testing.T) {
+
+	var err error
 
 	//log.SetDebugVisible(1)
 	local := onet.NewTCPTest(tSuite)
@@ -64,7 +72,7 @@ func TestApi(t *testing.T) {
 	msg := []byte("hello blscosi service")
 
 	el1 := &onet.Roster{}
-	_, err := client.SignatureRequest(el1, msg)
+	_, err = client.SignatureRequest(el1, msg)
 
 	require.NotNil(t, err)
 	// Create a roster with a missing aggregate and ID.
@@ -75,6 +83,10 @@ func TestApi(t *testing.T) {
 	require.Nil(t, err, "Couldn't send")
 	require.NotNil(t, res, "No response")
 	require.NotEmpty(t, res.Signature, "No response signature")
-	err2 := bls.Verify(tSuite, aggregatePublicKey, msg, res.Signature)
-	require.Nil(t, err2, "Signature incorrect")
+
+	err = bls.Verify(tSuite, aggregatePublicKey, msg, res.Signature)
+	require.Nil(t, err, "Signature incorrect")
+
+	err = bls.Verify(tSuite, aggregatePublicKey, msg, res.Propagated)
+	require.Nil(t, err, "Propagation incorrect")
 }

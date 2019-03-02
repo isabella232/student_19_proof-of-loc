@@ -49,7 +49,8 @@ type SignatureRequest struct {
 
 // SignatureResponse is what the BLSCosi service will reply to clients.
 type SignatureResponse struct {
-	Signature []byte
+	Signature  []byte
+	Propagated []byte
 }
 
 // PropagationFunction sends the complete signature to all members of the Cothority
@@ -94,7 +95,9 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (*SignatureResp
 		return nil, err
 	}
 
-	return &SignatureResponse{sig}, nil
+	prop := s.propagatedSignature
+
+	return &SignatureResponse{sig, prop}, nil
 
 }
 
