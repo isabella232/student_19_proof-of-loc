@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v3/pairing"
+	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 )
@@ -24,6 +25,8 @@ func TestServiceBLSCosi(t *testing.T) {
 	hosts, el, _ := local.GenTree(3, false)
 	defer local.CloseAll()
 
+	aggregatePublicKey := bls.AggregatePublicKeys(tSuite, el.Publics()...)
+
 	services := local.GetServices(hosts, serviceID)
 
 	// Send a request to the service to all hosts
@@ -38,6 +41,9 @@ func TestServiceBLSCosi(t *testing.T) {
 	reply, err := s.SignatureRequest(serviceReq)
 	require.Nil(t, err, "Couldn't send")
 	require.NotEmpty(t, reply.Signature, "No signature")
+
+	err2 := bls.Verify(tSuite, aggregatePublicKey, msg, reply.Signature)
+	require.Nil(t, err2, "Signature incorrect")
 }
 
 //Note: this test arbitrarily passes or fails -> needs to be adapted
@@ -50,6 +56,8 @@ func TestApi(t *testing.T) {
 
 	_, el, _ := local.GenTree(5, false)
 	defer local.CloseAll()
+
+	aggregatePublicKey := bls.AggregatePublicKeys(tSuite, el.Publics()...)
 
 	// Send a request to the service
 	client := NewClient()
@@ -67,4 +75,6 @@ func TestApi(t *testing.T) {
 	require.Nil(t, err, "Couldn't send")
 	require.NotNil(t, res, "No response")
 	require.NotEmpty(t, res.Signature, "No response signature")
+	err2 := bls.Verify(tSuite, aggregatePublicKey, msg, res.Signature)
+	require.Nil(t, err2, "Signature incorrect")
 }
