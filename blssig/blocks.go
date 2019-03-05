@@ -3,6 +3,7 @@ package proofofloc
 import (
 	"fmt"
 	"github.com/dedis/student_19_proof-of-loc/blssig/service"
+	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
@@ -25,6 +26,7 @@ type Block struct {
 
 //Chain represents a list of blocks that have joined the system
 type Chain struct {
+	suite    *pairing.SuiteBn256
 	Roster   *onet.Roster
 	blocks   []*Block
 	nbBlocks int
@@ -36,6 +38,11 @@ type PingMsg struct {
 	nonce        nonce
 	isReply      bool
 	startingTime time.Time
+}
+
+//NewChain builds a new chain
+func NewChain(suite *pairing.SuiteBn256) *Chain {
+	return &Chain{suite, &onet.Roster{}, make([]*Block, 0), 0}
 }
 
 /*
@@ -50,12 +57,7 @@ In your design though, you can already take such an extension into account.
 */
 func NewBlock(id *network.ServerIdentity, c *Chain) (*Block, error) {
 
-	//make listener for incoming messages
-	listener, err := network.NewTCPListener(id.Address, suite)
-	if err != nil {
-		log.Error(err, "Couldn't create listener:")
-		return nil, err
-	}
+	log.Lvl1("Setting up NewBlock")
 
 	latencies := make(map[*network.ServerIdentity]time.Duration)
 	pending := make(map[*network.ServerIdentity]nonce)
@@ -65,15 +67,28 @@ func NewBlock(id *network.ServerIdentity, c *Chain) (*Block, error) {
 
 	//get ping times from nodes
 
-	//-> set up listening
-	listener.Listen(newBlock.pingListen)
+	//-> set up listening: disabled for now
+	/*
+		listener, err := network.NewTCPListener(id.Address, c.suite)
+		if err != nil {
+			log.Error(err, "Couldn't create listener:")
+			return nil, err
+		}
+
+		listener.Listen(newBlock.pingListen)
+	*/
 
 	// send pings
 	nbPings := min(nbPingsNeeded, c.nbBlocks)
 
 	//for now just ping the first ones
+	log.Lvl1("Pinging " + string(nbPings) + " nodes")
 	for i := 0; i < nbPings; i++ {
-		newBlock.Ping(c.blocks[i])
+		//newBlock.Ping(c.blocks[i], c.suite) --for now just random delay
+		randomDelay := time.Duration((rand.Intn(300-20) + 20)) * time.Millisecond
+
+		newBlock.Latencies[c.blocks[i].id] = randomDelay
+		newBlock.nbReplies++
 	}
 
 	//wait till all reply
@@ -81,15 +96,18 @@ func NewBlock(id *network.ServerIdentity, c *Chain) (*Block, error) {
 		time.Sleep(1 * time.Millisecond)
 	}
 
+	log.Lvl1("Signing ")
 	//sign new block
 	client := service.NewClient()
 	client.SignatureRequest(c.Roster, []byte(fmt.Sprintf("%v", newBlock)))
 
+	log.Lvl1("Work")
 	//do some work
 	newBlock.work()
 
+	log.Lvl1("Add to chain")
 	//Add block to chain
-	c.Roster.Concat(id)
+	//c.Roster.Concat(id)
 	c.blocks = append(c.blocks, newBlock)
 	c.nbBlocks++
 
@@ -140,10 +158,14 @@ The ping function is, for now, a random delay between 20 ms and 300 ms.
 
 When node a pings node b, node a sends a message “ping” to node b (using onet) and node b replies with “pong” within a random delay time
 */
-func (b *Block) Ping(dest *Block) {
+func (b *Block) Ping(dest *Block, suite *pairing.SuiteBn256) {
 
-	//get random time delay between 20 and 300 ms
-	delay := time.Duration((rand.Intn(300-20) + 20)) * time.Millisecond
+	//get random time delay between 20 and 300 ms - for now, just return this ----------------------------------------
+	randomDelay := time.Duration((rand.Intn(300-20) + 20)) * time.Millisecond
+
+	b.Latencies[dest.id] = randomDelay
+	b.nbReplies++
+	// -----------------------------------------------------------------------------------
 
 	conn, err := network.NewTCPConn(dest.id.Address, suite)
 

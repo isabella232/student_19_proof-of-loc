@@ -16,7 +16,6 @@ func TestMain(m *testing.M) {
 	log.MainTest(m)
 }
 
-//Note: this test arbitrarily passes or fails -> needs to be adapted
 func TestServiceBLSCosi(t *testing.T) {
 
 	var err error
@@ -52,7 +51,6 @@ func TestServiceBLSCosi(t *testing.T) {
 
 }
 
-//Note: this test arbitrarily passes or fails -> needs to be adapted
 func TestApi(t *testing.T) {
 
 	var err error
