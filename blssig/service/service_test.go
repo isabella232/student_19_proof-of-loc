@@ -10,6 +10,8 @@ import (
 	"go.dedis.ch/onet/v3/log"
 )
 
+const blocksName = "testBlocks"
+
 var tSuite = pairing.NewSuiteBn256()
 
 func TestMain(m *testing.M) {
@@ -87,4 +89,47 @@ func TestApi(t *testing.T) {
 
 	err = bls.Verify(tSuite, aggregatePublicKey, msg, res.Propagated)
 	require.Nil(t, err, "Propagation incorrect")
+}
+
+func TestNewChain(t *testing.T) {
+
+	newChain := NewChain(tSuite)
+	require.NotNil(t, newChain, "Could not create new chain")
+
+}
+
+func TestNewBlock(t *testing.T) {
+
+	//log.SetDebugVisible(1)
+
+	//var err error
+
+	client := NewClient()
+
+	local := onet.NewTCPTest(tSuite)
+	newNode1 := local.GenServers(1)
+	//newNode2 := local.GenServers(1)
+	defer local.CloseAll()
+
+	chain := NewChain(tSuite)
+
+	newblock1, err := client.ProposeNewBlock(newNode1[0].ServerIdentity, chain)
+
+	require.NoError(t, err)
+	require.NotNil(t, newblock1, "Could not create new block")
+	/*require.Zero(t, newblock1.nbReplies, "Should not have any latencies, as this is first block")
+	require.Equal(t, newblock1.nbReplies, len(newblock1.Latencies), "nb replies not equal to number of latencies")
+
+	require.Equal(t, 1, len(chain.blocks), "Should have one block after first added")
+
+	newblock2, err := ProposeNewBlock(newNode2[0].ServerIdentity, chain)
+
+	require.NoError(t, err)
+	require.NotNil(t, newblock2, "Could not create new block")
+	require.Equal(t, 1, newblock2.nbReplies, "Should have 1 latency, as this is second block")
+	require.Equal(t, newblock2.nbReplies, len(newblock2.Latencies), "nb replies not equal to number of latencies")
+	require.NotEmpty(t, newblock2.Latencies, "Should have at least 1 latency")
+
+	require.Equal(t, 2, len(chain.blocks), "Should have two block after second added")*/
+
 }

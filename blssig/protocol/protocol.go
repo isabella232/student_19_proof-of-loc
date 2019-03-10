@@ -1,10 +1,15 @@
 package protocol
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"github.com/dedis/student_19_proof-of-loc/blssig"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
+	"time"
 )
 
 // SimpleBLSCoSi is the main structure holding the round and the onet.Node.
@@ -28,6 +33,35 @@ type SimpleBLSCoSi struct {
 
 // VerificationFn function
 type VerificationFn func(msg []byte) error
+
+//NewLatencyVerificatingProtocol creates a new protocol which checks the latencies of a proposed new block
+//and makes sure they are acceptable
+func NewLatencyVerificatingProtocol(n *onet.TreeNodeInstance) (onet.ProtocolInstance, error) {
+	vf := func(a []byte) error {
+
+		//decode a as block struct
+		block := proofofloc.Block{}
+		reader := bytes.NewReader(a)
+		err := binary.Read(reader, binary.BigEndian, &block)
+		if err != nil {
+			return err
+		}
+
+		//check latencies -> 20 < x < 300 ms
+		for _, latency := range block.Latencies {
+			if latency < 20*time.Millisecond {
+				return errors.New("Latency too short")
+			}
+			if latency > 300*time.Millisecond {
+				return errors.New("Latency too long")
+			}
+		}
+
+		return nil
+
+	}
+	return NewProtocol(n, vf, pairing.NewSuiteBn256())
+}
 
 // NewDefaultProtocol is the default protocol function used for registration
 // with an always-true verification.

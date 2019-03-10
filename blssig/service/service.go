@@ -3,14 +3,15 @@ package service
 
 import (
 	"errors"
-	"time"
-
 	"github.com/dedis/student_19_proof-of-loc/blssig/protocol"
 	uuid "github.com/satori/go.uuid"
 	"go.dedis.ch/cothority/v3/messaging"
+	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
+	"math/rand"
+	"time"
 )
 
 // This file contains all the code to run a BLSCoSi service. It is used to reply to
@@ -21,6 +22,8 @@ import (
 const ServiceName = "BLSCoSiService"
 
 const protoName = "blscosiproto"
+
+const nbPingsNeeded = 5
 
 var serviceID onet.ServiceID
 
@@ -41,21 +44,9 @@ type BLSCoSiService struct {
 	propagatedSignature []byte
 }
 
-// SignatureRequest is what the BLSCosi service is expected to receive from clients.
-type SignatureRequest struct {
-	Message []byte
-	Roster  *onet.Roster
-}
-
-// SignatureResponse is what the BLSCosi service will reply to clients.
-type SignatureResponse struct {
-	Signature  []byte
-	Propagated []byte
-}
-
-// PropagationFunction sends the complete signature to all members of the Cothority
-type PropagationFunction struct {
-	Signature []byte
+//NewChain builds a new chain
+func NewChain(suite *pairing.SuiteBn256) *Chain {
+	return &Chain{suite, &onet.Roster{}, make([]*Block, 0)}
 }
 
 // SignatureRequest treats external requests to this service.
@@ -99,6 +90,50 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (*SignatureResp
 
 	return &SignatureResponse{sig, prop}, nil
 
+}
+
+/*Ping allows a validator node to ping another node
+
+The ping function is, for now, a random delay between 20 ms and 300 ms.
+
+When node a pings node b, node a sends a message “ping” to node b (using onet) and node b replies with “pong” within a random delay time
+*/
+func (b *Block) Ping(dest *Block, suite *pairing.SuiteBn256) {
+
+	//get random time delay between 20 and 300 ms - for now, just return this ----------------------------------------
+	randomDelay := time.Duration((rand.Intn(300-20) + 20)) * time.Millisecond
+
+	b.Latencies[dest.id] = randomDelay
+	b.nbReplies++
+	// -----------------------------------------------------------------------------------
+
+	conn, err := network.NewTCPConn(dest.id.Address, suite)
+
+	if err != nil {
+		log.Error(err, "Couldn't create new TCP connection:")
+		return
+	}
+
+	nonce := nonce(rand.Int())
+
+	b.nonces[dest.id] = nonce
+
+	_, err1 := conn.Send(PingMsg{b.id, nonce, false, time.Now()})
+
+	if err1 != nil {
+		log.Error(err, "Couldn't send ping message:")
+		return
+	}
+
+	conn.Close()
+
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
