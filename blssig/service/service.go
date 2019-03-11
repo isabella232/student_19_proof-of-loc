@@ -2,7 +2,9 @@
 package service
 
 import (
+	"crypto/sha256"
 	"errors"
+	"github.com/dedis/student_19_proof-of-loc/blssig/proofofloc"
 	"github.com/dedis/student_19_proof-of-loc/blssig/protocol"
 	uuid "github.com/satori/go.uuid"
 	"go.dedis.ch/cothority/v3/messaging"
@@ -10,6 +12,8 @@ import (
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
+	"go.dedis.ch/protobuf"
+	bbolt "go.etcd.io/bbolt"
 	"math/rand"
 	"time"
 )
@@ -45,8 +49,45 @@ type BLSCoSiService struct {
 }
 
 //NewChain builds a new chain
-func NewChain(suite *pairing.SuiteBn256) *Chain {
-	return &Chain{suite, &onet.Roster{}, make([]*Block, 0)}
+func NewChain(suite *pairing.SuiteBn256, Roster *onet.Roster) *proofofloc.Chain {
+	chain := &proofofloc.Chain{Suite: suite, Roster: Roster, Blocks: make([]*proofofloc.Block, 0), BucketName: []byte("proofoflocBlocks")}
+
+	return chain
+}
+
+//StoreBlock adds a block to a chain
+func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResponse, error) {
+	//do some work
+	work(request.Block)
+
+	//value is byte encoding of block
+	value, err := protobuf.Encode(request.Block)
+	if err != nil {
+		return nil, err
+	}
+
+	h := sha256.New()
+	h.Write(value)
+
+	//key is the hash of the block
+	key := h.Sum([]byte{})
+
+	//Add block to chain
+	db, bucket := s.GetAdditionalBucket([]byte(request.Chain.BucketName))
+
+	db.Update(func(tx *bbolt.Tx) error {
+		tx.Bucket(bucket).Put(key, value)
+		return nil
+	})
+
+	//chain.Roster.Concat(block.id)
+	request.Chain.Blocks = append(request.Chain.Blocks, request.Block)
+
+	return &StoreBlockResponse{true}, nil
+}
+
+func work(block *proofofloc.Block) {
+
 }
 
 // SignatureRequest treats external requests to this service.
@@ -98,27 +139,27 @@ The ping function is, for now, a random delay between 20 ms and 300 ms.
 
 When node a pings node b, node a sends a message “ping” to node b (using onet) and node b replies with “pong” within a random delay time
 */
-func (b *Block) Ping(dest *Block, suite *pairing.SuiteBn256) {
+func ping(b *proofofloc.Block, dest *proofofloc.Block, suite *pairing.SuiteBn256) {
 
 	//get random time delay between 20 and 300 ms - for now, just return this ----------------------------------------
 	randomDelay := time.Duration((rand.Intn(300-20) + 20)) * time.Millisecond
 
-	b.Latencies[dest.id] = randomDelay
-	b.nbReplies++
+	b.Latencies[dest.ID] = randomDelay
+	b.NbReplies++
 	// -----------------------------------------------------------------------------------
 
-	conn, err := network.NewTCPConn(dest.id.Address, suite)
+	conn, err := network.NewTCPConn(dest.ID.Address, suite)
 
 	if err != nil {
 		log.Error(err, "Couldn't create new TCP connection:")
 		return
 	}
 
-	nonce := nonce(rand.Int())
+	nonce := proofofloc.Nonce(rand.Int())
 
-	b.nonces[dest.id] = nonce
+	b.Nonces[dest.ID] = nonce
 
-	_, err1 := conn.Send(PingMsg{b.id, nonce, false, time.Now()})
+	_, err1 := conn.Send(proofofloc.PingMsg{ID: b.ID, Nonce: nonce, IsReply: false, StartingTime: time.Now()})
 
 	if err1 != nil {
 		log.Error(err, "Couldn't send ping message:")
@@ -127,6 +168,39 @@ func (b *Block) Ping(dest *Block, suite *pairing.SuiteBn256) {
 
 	conn.Close()
 
+}
+
+//pingListen listens for pings and pongs from other validators and handles them accordingly
+func pingListen(b *proofofloc.Block, c network.Conn) {
+
+	env, err := c.Receive()
+
+	if err != nil {
+		log.Error(err, "Couldn't send receive message from connection:")
+		return
+	}
+
+	//Filter for the two types of messages we care about
+	Msg, isPing := env.Msg.(proofofloc.PingMsg)
+
+	// Case 1: someone pings ups -> reply with pong and control values
+	if isPing {
+		if !Msg.IsReply {
+			c.Send(proofofloc.PingMsg{ID: b.ID, Nonce: Msg.Nonce, IsReply: true, StartingTime: Msg.StartingTime})
+		} else {
+			//Case 2: someone replies to our ping -> check return time
+			if Msg.IsReply && b.Nonces[Msg.ID] == Msg.Nonce {
+
+				latency := time.Since(Msg.StartingTime)
+				b.Latencies[Msg.ID] = latency
+				b.NbReplies++
+
+			}
+		}
+
+		c.Close()
+
+	}
 }
 
 func min(a, b int) int {

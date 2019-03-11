@@ -93,25 +93,28 @@ func TestApi(t *testing.T) {
 
 func TestNewChain(t *testing.T) {
 
-	newChain := NewChain(tSuite)
+	newChain := NewChain(tSuite, &onet.Roster{})
 	require.NotNil(t, newChain, "Could not create new chain")
 
 }
 
 func TestNewBlock(t *testing.T) {
 
-	//log.SetDebugVisible(1)
+	log.SetDebugVisible(1)
 
 	//var err error
 
 	client := NewClient()
 
 	local := onet.NewTCPTest(tSuite)
+
+	_, el, _ := local.GenTree(3, false)
+
 	newNode1 := local.GenServers(1)
 	//newNode2 := local.GenServers(1)
 	defer local.CloseAll()
 
-	chain := NewChain(tSuite)
+	chain := NewChain(tSuite, el)
 
 	newblock1, err := client.ProposeNewBlock(newNode1[0].ServerIdentity, chain)
 

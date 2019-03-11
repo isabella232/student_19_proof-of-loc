@@ -7,28 +7,29 @@ import (
 	"time"
 )
 
-//nonce represents a random value to make a message unique
-type nonce int
+//Nonce represents a random value to make a message unique
+type Nonce int
 
 // Block represents a block with unique identification and a list of pings
 type Block struct {
-	id        *network.ServerIdentity
+	ID        *network.ServerIdentity
 	Latencies map[*network.ServerIdentity]time.Duration
-	nonces    map[*network.ServerIdentity]nonce
-	nbReplies int
+	Nonces    map[*network.ServerIdentity]Nonce
+	NbReplies int
 }
 
 //Chain represents a list of blocks that have joined the system
 type Chain struct {
-	suite  *pairing.SuiteBn256
-	Roster *onet.Roster
-	blocks []*Block
+	Suite      *pairing.SuiteBn256
+	Roster     *onet.Roster
+	Blocks     []*Block
+	BucketName []byte
 }
 
 //PingMsg represents a message sent to "ping" another validator
 type PingMsg struct {
-	id           *network.ServerIdentity
-	nonce        nonce
-	isReply      bool
-	startingTime time.Time
+	ID           *network.ServerIdentity
+	Nonce        Nonce
+	IsReply      bool
+	StartingTime time.Time
 }

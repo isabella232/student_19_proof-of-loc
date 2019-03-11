@@ -1,14 +1,13 @@
 package protocol
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
-	"github.com/dedis/student_19_proof-of-loc/blssig"
+	"github.com/dedis/student_19_proof-of-loc/blssig/proofofloc"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
+	"go.dedis.ch/protobuf"
 	"time"
 )
 
@@ -40,9 +39,8 @@ func NewLatencyVerificatingProtocol(n *onet.TreeNodeInstance) (onet.ProtocolInst
 	vf := func(a []byte) error {
 
 		//decode a as block struct
-		block := proofofloc.Block{}
-		reader := bytes.NewReader(a)
-		err := binary.Read(reader, binary.BigEndian, &block)
+		var block proofofloc.Block
+		err := protobuf.Decode(a, &block)
 		if err != nil {
 			return err
 		}

@@ -6,5 +6,7 @@ require (
 	go.dedis.ch/cothority/v3 v3.0.0-pre5
 	go.dedis.ch/kyber/v3 v3.0.0-pre4
 	go.dedis.ch/onet/v3 v3.0.0-pre5
+	go.dedis.ch/protobuf v1.0.6
+	go.etcd.io/bbolt v1.3.0
 	gopkg.in/satori/go.uuid.v1 v1.2.0
 )

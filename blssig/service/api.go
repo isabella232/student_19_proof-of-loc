@@ -1,18 +1,15 @@
 package service
 
 import (
-	"encoding/binary"
 	"errors"
-	"fmt"
-	"math/rand"
-	"time"
-
 	"github.com/dedis/student_19_proof-of-loc/blssig/proofofloc"
 	"go.dedis.ch/cothority/v3"
-	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
+	"go.dedis.ch/protobuf"
+	"math/rand"
+	"time"
 )
 
 // Client is a structure to communicate with the BLSCoSi service
@@ -45,11 +42,6 @@ func (c *Client) SignatureRequest(r *onet.Roster, msg []byte) (*SignatureRespons
 	return reply, nil
 }
 
-//CreateNewChain allows a client to create a new chain
-func (c *Client) CreateNewChain(suite *pairing.SuiteBn256) *Chain {
-	return NewChain(suite)
-}
-
 /*
 
 ProposeNewBlock creates a new validator with given address and public key
@@ -60,13 +52,13 @@ but later we might add a “work” function, either computing a hash preimage l
 In your design though, you can already take such an extension into account.
 
 */
-func (c *Client) ProposeNewBlock(id *network.ServerIdentity, chain *Chain) (*Block, error) {
+func (c *Client) ProposeNewBlock(id *network.ServerIdentity, chain *proofofloc.Chain) (*proofofloc.Block, error) {
 
 	latencies := make(map[*network.ServerIdentity]time.Duration)
-	pending := make(map[*network.ServerIdentity]nonce)
+	pending := make(map[*network.ServerIdentity]proofofloc.Nonce)
 
 	//create new block
-	newBlock := &Block{id, latencies, pending, 0}
+	newBlock := &proofofloc.Block{ID: id, Latencies: latencies, Nonces: pending, NbReplies: 0}
 
 	//get ping times from nodes
 
@@ -82,83 +74,52 @@ func (c *Client) ProposeNewBlock(id *network.ServerIdentity, chain *Chain) (*Blo
 	*/
 
 	// send pings
-	nbPings := min(nbPingsNeeded, len(chain.blocks))
+	nbPings := min(nbPingsNeeded, len(chain.Blocks))
 
 	//for now just ping the first ones
 	for i := 0; i < nbPings; i++ {
 		//newBlock.Ping(c.blocks[i], c.suite) --for now just random delay
 		randomDelay := time.Duration((rand.Intn(300-20) + 20)) * time.Millisecond
 
-		newBlock.Latencies[chain.blocks[i].id] = randomDelay
-		newBlock.nbReplies++
+		newBlock.Latencies[chain.Blocks[i].ID] = randomDelay
+		newBlock.NbReplies++
 	}
 
 	//wait till all reply
-	for newBlock.nbReplies < nbPings {
+	for newBlock.NbReplies < nbPings {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	return c.ProposeBlock(newBlock, chain)
+	return c.proposeBlock(newBlock, chain)
 
 }
 
-//ProposeBlock allows a client to propose an already formed block to a chain
-func (c *Client) ProposeBlock(block *Block, chain *Chain) (*Block, error) {
+func (c *Client) proposeBlock(block *proofofloc.Block, chain *proofofloc.Chain) (*proofofloc.Block, error) {
 
-	client := NewClient()
-
-	buf := &bytes.Buffer{}
-	err := binary.Write(buf, binary.BigEndian, block)
+	enc, err := protobuf.Encode(block)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(buf.Bytes())
 
-	client.SignatureRequest(chain.Roster, buf.Bytes())
+	c.SignatureRequest(chain.Roster, enc)
 
-	//do some work
-	block.work()
+	storageRequest := &StoreBlockRequest{
+		Chain: chain,
+		Block: block,
+	}
 
-	//Add block to chain
-	//chain.Roster.Concat(block.id)
-	chain.blocks = append(chain.blocks, block)
+	if len(chain.Roster.List) == 0 {
+		return nil, errors.New("Got an empty roster-list")
+	}
+
+	dst := chain.Roster.List[0]
+
+	log.Lvl1("Sending message to", dst)
+	reply := &StoreBlockResponse{}
+	err = c.SendProtobuf(dst, storageRequest, reply)
+	if err != nil {
+		return nil, err
+	}
 
 	return block, nil
-}
-
-func (b *Block) work() {
-
-}
-
-//pingListen listens for pings and pongs from other validators and handles them accordingly
-func (b *Block) pingListen(c network.Conn) {
-
-	env, err := c.Receive()
-
-	if err != nil {
-		log.Error(err, "Couldn't send receive message from connection:")
-		return
-	}
-
-	//Filter for the two types of messages we care about
-	Msg, isPing := env.Msg.(PingMsg)
-
-	// Case 1: someone pings ups -> reply with pong and control values
-	if isPing {
-		if !Msg.isReply {
-			c.Send(PingMsg{b.id, Msg.nonce, true, Msg.startingTime})
-		} else {
-			//Case 2: someone replies to our ping -> check return time
-			if Msg.isReply && b.nonces[Msg.id] == Msg.nonce {
-
-				latency := time.Since(Msg.startingTime)
-				b.Latencies[Msg.id] = latency
-				b.nbReplies++
-
-			}
-		}
-
-		c.Close()
-
-	}
 }
