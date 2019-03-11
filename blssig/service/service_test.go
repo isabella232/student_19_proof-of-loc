@@ -18,7 +18,7 @@ func TestMain(m *testing.M) {
 	log.MainTest(m)
 }
 
-func TestServiceBLSCosi(t *testing.T) {
+func TestSignatureRequestService(t *testing.T) {
 
 	var err error
 
@@ -53,7 +53,7 @@ func TestServiceBLSCosi(t *testing.T) {
 
 }
 
-func TestApi(t *testing.T) {
+func TestSignatureRequestApi(t *testing.T) {
 
 	var err error
 
@@ -91,14 +91,14 @@ func TestApi(t *testing.T) {
 	require.Nil(t, err, "Propagation incorrect")
 }
 
-func TestNewChain(t *testing.T) {
+func TestNewChainService(t *testing.T) {
 
 	newChain := NewChain(&onet.Roster{})
 	require.NotNil(t, newChain, "Could not create new chain")
 
 }
 
-func TestNewBlock(t *testing.T) {
+func TestNewBlockApi(t *testing.T) {
 
 	log.SetDebugVisible(1)
 
@@ -111,28 +111,28 @@ func TestNewBlock(t *testing.T) {
 	_, el, _ := local.GenTree(3, false)
 
 	newNode1 := local.GenServers(1)
-	//newNode2 := local.GenServers(1)
+	newNode2 := local.GenServers(1)
 	defer local.CloseAll()
 
 	chain := NewChain(el)
 
-	newblock1, err := client.ProposeNewBlock(newNode1[0].ServerIdentity, chain)
+	newblock1, chain, err := client.ProposeNewBlock(newNode1[0].ServerIdentity, chain)
 
 	require.NoError(t, err)
 	require.NotNil(t, newblock1, "Could not create new block")
-	/*require.Zero(t, newblock1.nbReplies, "Should not have any latencies, as this is first block")
-	require.Equal(t, newblock1.nbReplies, len(newblock1.Latencies), "nb replies not equal to number of latencies")
+	require.Zero(t, newblock1.NbReplies, "Should not have any latencies, as this is first block")
+	require.Equal(t, newblock1.NbReplies, len(newblock1.Latencies), "nb replies not equal to number of latencies")
 
-	require.Equal(t, 1, len(chain.blocks), "Should have one block after first added")
+	require.Equal(t, 1, len(chain.Blocks), "Should have one block after first added")
 
-	newblock2, err := ProposeNewBlock(newNode2[0].ServerIdentity, chain)
+	newblock2, chain, err := client.ProposeNewBlock(newNode2[0].ServerIdentity, chain)
 
 	require.NoError(t, err)
 	require.NotNil(t, newblock2, "Could not create new block")
-	require.Equal(t, 1, newblock2.nbReplies, "Should have 1 latency, as this is second block")
-	require.Equal(t, newblock2.nbReplies, len(newblock2.Latencies), "nb replies not equal to number of latencies")
+	require.Equal(t, 1, newblock2.NbReplies, "Should have 1 latency, as this is second block")
+	require.Equal(t, newblock2.NbReplies, len(newblock2.Latencies), "nb replies not equal to number of latencies")
 	require.NotEmpty(t, newblock2.Latencies, "Should have at least 1 latency")
 
-	require.Equal(t, 2, len(chain.blocks), "Should have two block after second added")*/
+	require.Equal(t, 2, len(chain.Blocks), "Should have two block after second added")
 
 }

@@ -50,60 +50,6 @@ type BLSCoSiService struct {
 	propagatedSignature []byte
 }
 
-//NewChain builds a new chain
-func NewChain(Roster *onet.Roster) *proofofloc.Chain {
-	chain := &proofofloc.Chain{Roster: Roster, Blocks: make([]*proofofloc.Block, 0), BucketName: []byte("proofoflocBlocks")}
-
-	return chain
-}
-
-//StoreBlock adds a block to a chain
-func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResponse, error) {
-	//do some work
-
-	var block *proofofloc.Block
-	err := protobuf.Decode(request.Block, block)
-	if err != nil {
-		return nil, err
-	}
-	work(block)
-
-	var chain *proofofloc.Chain
-	err = protobuf.Decode(request.Chain, chain)
-	if err != nil {
-		return nil, err
-	}
-
-	//value is byte encoding of block
-	value, err := protobuf.Encode(request.Block)
-	if err != nil {
-		return nil, err
-	}
-
-	h := sha256.New()
-	h.Write(value)
-
-	//key is the hash of the block
-	key := h.Sum([]byte{})
-
-	//Add block to chain
-	db, bucket := s.GetAdditionalBucket([]byte(chain.BucketName))
-
-	db.Update(func(tx *bbolt.Tx) error {
-		tx.Bucket(bucket).Put(key, value)
-		return nil
-	})
-
-	//chain.Roster.Concat(block.id)
-	chain.Blocks = append(chain.Blocks, block)
-
-	return &StoreBlockResponse{true}, nil
-}
-
-func work(block *proofofloc.Block) {
-
-}
-
 // SignatureRequest treats external requests to this service.
 func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (*SignatureResponse, error) {
 	if req.Roster.ID.IsNil() {
@@ -144,6 +90,59 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (*SignatureResp
 	prop := s.propagatedSignature
 
 	return &SignatureResponse{sig, prop}, nil
+
+}
+
+//NewChain builds a new chain
+func NewChain(Roster *onet.Roster) *proofofloc.Chain {
+	chain := &proofofloc.Chain{Roster: Roster, Blocks: make([]*proofofloc.Block, 0), BucketName: []byte("proofoflocBlocks")}
+
+	return chain
+}
+
+//StoreBlock adds a block to a chain
+func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResponse, error) {
+
+	block := proofofloc.Block{}
+	err := protobuf.Decode(request.Block, &block)
+	if err != nil {
+		return nil, err
+	}
+	//do some work
+	work(&block)
+
+	chain := proofofloc.Chain{}
+	err = protobuf.Decode(request.Chain, &chain)
+	if err != nil {
+		return nil, err
+	}
+
+	h := sha256.New()
+	h.Write(request.Block)
+
+	//key is the hash of the block
+	key := h.Sum([]byte{})
+
+	//Add block to chain
+	db, bucket := s.GetAdditionalBucket([]byte(chain.BucketName))
+
+	db.Update(func(tx *bbolt.Tx) error {
+		tx.Bucket(bucket).Put(key, request.Block)
+		return nil
+	})
+
+	//chain.Roster.Concat(block.id)
+	chain.Blocks = append(chain.Blocks, &block)
+
+	chainBytes, err := protobuf.Encode(&chain)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StoreBlockResponse{true, chainBytes}, nil
+}
+
+func work(block *proofofloc.Block) {
 
 }
 
@@ -229,6 +228,12 @@ func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
 		ServiceProcessor: onet.NewServiceProcessor(c),
 	}
 	err := s.RegisterHandler(s.SignatureRequest)
+	if err != nil {
+		log.Error(err, "Couldn't register handler:")
+		return nil, err
+	}
+
+	err = s.RegisterHandler(s.StoreBlock)
 	if err != nil {
 		log.Error(err, "Couldn't register handler:")
 		return nil, err

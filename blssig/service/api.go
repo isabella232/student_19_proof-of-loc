@@ -52,7 +52,7 @@ but later we might add a “work” function, either computing a hash preimage l
 In your design though, you can already take such an extension into account.
 
 */
-func (c *Client) ProposeNewBlock(id *network.ServerIdentity, chain *proofofloc.Chain) (*proofofloc.Block, error) {
+func (c *Client) ProposeNewBlock(id *network.ServerIdentity, chain *proofofloc.Chain) (*proofofloc.Block, *proofofloc.Chain, error) {
 
 	latencies := make(map[*network.ServerIdentity]time.Duration)
 	pending := make(map[*network.ServerIdentity]proofofloc.Nonce)
@@ -90,20 +90,20 @@ func (c *Client) ProposeNewBlock(id *network.ServerIdentity, chain *proofofloc.C
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	return c.proposeBlock(newBlock, chain)
+	return c.storeBlock(newBlock, chain)
 
 }
 
-func (c *Client) proposeBlock(block *proofofloc.Block, chain *proofofloc.Chain) (*proofofloc.Block, error) {
+func (c *Client) storeBlock(block *proofofloc.Block, chain *proofofloc.Chain) (*proofofloc.Block, *proofofloc.Chain, error) {
 
 	blockBytes, err := protobuf.Encode(block)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	chainBytes, err := protobuf.Encode(chain)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	c.SignatureRequest(chain.Roster, blockBytes)
@@ -114,7 +114,7 @@ func (c *Client) proposeBlock(block *proofofloc.Block, chain *proofofloc.Chain) 
 	}
 
 	if len(chain.Roster.List) == 0 {
-		return nil, errors.New("Got an empty roster-list")
+		return nil, nil, errors.New("Got an empty roster-list")
 	}
 
 	dst := chain.Roster.List[0]
@@ -123,8 +123,14 @@ func (c *Client) proposeBlock(block *proofofloc.Block, chain *proofofloc.Chain) 
 	reply := &StoreBlockResponse{}
 	err = c.SendProtobuf(dst, storageRequest, reply)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return block, nil
+	finalChain := proofofloc.Chain{}
+	err = protobuf.Decode(reply.Chain, &finalChain)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return block, &finalChain, nil
 }

@@ -30,4 +30,5 @@ type StoreBlockRequest struct {
 //StoreBlockResponse is what a BLSCosi service replies to clients trying to store blocks
 type StoreBlockResponse struct {
 	BlockAdded bool
+	Chain      []byte
 }
