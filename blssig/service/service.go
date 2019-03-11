@@ -39,6 +39,8 @@ func init() {
 	network.RegisterMessage(&SignatureRequest{})
 	network.RegisterMessage(&SignatureResponse{})
 	network.RegisterMessage(&PropagationFunction{})
+	network.RegisterMessage(&StoreBlockRequest{})
+	network.RegisterMessage(&StoreBlockResponse{})
 }
 
 // BLSCoSiService is the service that handles collective signing operations
@@ -49,8 +51,8 @@ type BLSCoSiService struct {
 }
 
 //NewChain builds a new chain
-func NewChain(suite *pairing.SuiteBn256, Roster *onet.Roster) *proofofloc.Chain {
-	chain := &proofofloc.Chain{Suite: suite, Roster: Roster, Blocks: make([]*proofofloc.Block, 0), BucketName: []byte("proofoflocBlocks")}
+func NewChain(Roster *onet.Roster) *proofofloc.Chain {
+	chain := &proofofloc.Chain{Roster: Roster, Blocks: make([]*proofofloc.Block, 0), BucketName: []byte("proofoflocBlocks")}
 
 	return chain
 }
@@ -58,7 +60,19 @@ func NewChain(suite *pairing.SuiteBn256, Roster *onet.Roster) *proofofloc.Chain 
 //StoreBlock adds a block to a chain
 func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResponse, error) {
 	//do some work
-	work(request.Block)
+
+	var block *proofofloc.Block
+	err := protobuf.Decode(request.Block, block)
+	if err != nil {
+		return nil, err
+	}
+	work(block)
+
+	var chain *proofofloc.Chain
+	err = protobuf.Decode(request.Chain, chain)
+	if err != nil {
+		return nil, err
+	}
 
 	//value is byte encoding of block
 	value, err := protobuf.Encode(request.Block)
@@ -73,7 +87,7 @@ func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResp
 	key := h.Sum([]byte{})
 
 	//Add block to chain
-	db, bucket := s.GetAdditionalBucket([]byte(request.Chain.BucketName))
+	db, bucket := s.GetAdditionalBucket([]byte(chain.BucketName))
 
 	db.Update(func(tx *bbolt.Tx) error {
 		tx.Bucket(bucket).Put(key, value)
@@ -81,7 +95,7 @@ func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResp
 	})
 
 	//chain.Roster.Concat(block.id)
-	request.Chain.Blocks = append(request.Chain.Blocks, request.Block)
+	chain.Blocks = append(chain.Blocks, block)
 
 	return &StoreBlockResponse{true}, nil
 }

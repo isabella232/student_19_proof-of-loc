@@ -96,16 +96,21 @@ func (c *Client) ProposeNewBlock(id *network.ServerIdentity, chain *proofofloc.C
 
 func (c *Client) proposeBlock(block *proofofloc.Block, chain *proofofloc.Chain) (*proofofloc.Block, error) {
 
-	enc, err := protobuf.Encode(block)
+	blockBytes, err := protobuf.Encode(block)
 	if err != nil {
 		return nil, err
 	}
 
-	c.SignatureRequest(chain.Roster, enc)
+	chainBytes, err := protobuf.Encode(chain)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SignatureRequest(chain.Roster, blockBytes)
 
 	storageRequest := &StoreBlockRequest{
-		Chain: chain,
-		Block: block,
+		Chain: chainBytes,
+		Block: blockBytes,
 	}
 
 	if len(chain.Roster.List) == 0 {

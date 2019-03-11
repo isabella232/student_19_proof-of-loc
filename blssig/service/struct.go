@@ -1,7 +1,6 @@
 package service
 
 import (
-	"github.com/dedis/student_19_proof-of-loc/blssig/proofofloc"
 	"go.dedis.ch/onet/v3"
 )
 
@@ -24,8 +23,8 @@ type PropagationFunction struct {
 
 //StoreBlockRequest is what the BLSCosi service is expected to receive from clients to add Blocks to a chain
 type StoreBlockRequest struct {
-	Chain *proofofloc.Chain
-	Block *proofofloc.Block
+	Chain []byte
+	Block []byte
 }
 
 //StoreBlockResponse is what a BLSCosi service replies to clients trying to store blocks

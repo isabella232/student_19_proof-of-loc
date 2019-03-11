@@ -1,7 +1,6 @@
 package proofofloc
 
 import (
-	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/network"
 	"time"
@@ -20,7 +19,6 @@ type Block struct {
 
 //Chain represents a list of blocks that have joined the system
 type Chain struct {
-	Suite      *pairing.SuiteBn256
 	Roster     *onet.Roster
 	Blocks     []*Block
 	BucketName []byte
