@@ -91,13 +91,6 @@ func TestSignatureRequestApi(t *testing.T) {
 	require.Nil(t, err, "Propagation incorrect")
 }
 
-func TestNewChainService(t *testing.T) {
-
-	newChain := NewChain(&onet.Roster{})
-	require.NotNil(t, newChain, "Could not create new chain")
-
-}
-
 func TestNewBlockApi(t *testing.T) {
 
 	log.SetDebugVisible(1)
@@ -114,25 +107,12 @@ func TestNewBlockApi(t *testing.T) {
 	newNode2 := local.GenServers(1)
 	defer local.CloseAll()
 
-	chain := NewChain(el)
-
-	newblock1, chain, err := client.ProposeNewBlock(newNode1[0].ServerIdentity, chain)
+	err := client.ProposeNewBlock(newNode1[0].ServerIdentity, el)
 
 	require.NoError(t, err)
-	require.NotNil(t, newblock1, "Could not create new block")
-	require.Zero(t, newblock1.NbReplies, "Should not have any latencies, as this is first block")
-	require.Equal(t, newblock1.NbReplies, len(newblock1.Latencies), "nb replies not equal to number of latencies")
 
-	require.Equal(t, 1, len(chain.Blocks), "Should have one block after first added")
-
-	newblock2, chain, err := client.ProposeNewBlock(newNode2[0].ServerIdentity, chain)
+	err = client.ProposeNewBlock(newNode2[0].ServerIdentity, el)
 
 	require.NoError(t, err)
-	require.NotNil(t, newblock2, "Could not create new block")
-	require.Equal(t, 1, newblock2.NbReplies, "Should have 1 latency, as this is second block")
-	require.Equal(t, newblock2.NbReplies, len(newblock2.Latencies), "nb replies not equal to number of latencies")
-	require.NotEmpty(t, newblock2.Latencies, "Should have at least 1 latency")
-
-	require.Equal(t, 2, len(chain.Blocks), "Should have two block after second added")
 
 }

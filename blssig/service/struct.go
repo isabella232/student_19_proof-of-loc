@@ -23,12 +23,11 @@ type PropagationFunction struct {
 
 //StoreBlockRequest is what the BLSCosi service is expected to receive from clients to add Blocks to a chain
 type StoreBlockRequest struct {
-	Chain []byte
-	Block []byte
+	Roster *onet.Roster
+	Block  []byte
 }
 
 //StoreBlockResponse is what a BLSCosi service replies to clients trying to store blocks
 type StoreBlockResponse struct {
 	BlockAdded bool
-	Chain      []byte
 }

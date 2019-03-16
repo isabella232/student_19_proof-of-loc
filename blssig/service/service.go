@@ -36,11 +36,9 @@ func init() {
 	serviceID, err = onet.RegisterNewService(ServiceName, newBLSCoSiService)
 	log.ErrFatal(err)
 	onet.GlobalProtocolRegister(protoName, protocol.NewDefaultProtocol)
-	network.RegisterMessage(&SignatureRequest{})
-	network.RegisterMessage(&SignatureResponse{})
+	network.RegisterMessages(&SignatureRequest{}, &SignatureResponse{})
 	network.RegisterMessage(&PropagationFunction{})
-	network.RegisterMessage(&StoreBlockRequest{})
-	network.RegisterMessage(&StoreBlockResponse{})
+	network.RegisterMessages(&StoreBlockRequest{}, &StoreBlockResponse{})
 }
 
 // BLSCoSiService is the service that handles collective signing operations
@@ -48,6 +46,7 @@ type BLSCoSiService struct {
 	*onet.ServiceProcessor
 	propagationFunction messaging.PropagationFunc
 	propagatedSignature []byte
+	Chain               *proofofloc.Chain
 }
 
 // SignatureRequest treats external requests to this service.
@@ -93,13 +92,6 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (*SignatureResp
 
 }
 
-//NewChain builds a new chain
-func NewChain(Roster *onet.Roster) *proofofloc.Chain {
-	chain := &proofofloc.Chain{Roster: Roster, Blocks: make([]*proofofloc.Block, 0), BucketName: []byte("proofoflocBlocks")}
-
-	return chain
-}
-
 //StoreBlock adds a block to a chain
 func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResponse, error) {
 
@@ -111,12 +103,6 @@ func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResp
 	//do some work
 	work(&block)
 
-	chain := proofofloc.Chain{}
-	err = protobuf.Decode(request.Chain, &chain)
-	if err != nil {
-		return nil, err
-	}
-
 	h := sha256.New()
 	h.Write(request.Block)
 
@@ -124,7 +110,7 @@ func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResp
 	key := h.Sum([]byte{})
 
 	//Add block to chain
-	db, bucket := s.GetAdditionalBucket([]byte(chain.BucketName))
+	db, bucket := s.GetAdditionalBucket([]byte(s.Chain.BucketName))
 
 	db.Update(func(tx *bbolt.Tx) error {
 		tx.Bucket(bucket).Put(key, request.Block)
@@ -132,14 +118,9 @@ func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResp
 	})
 
 	//chain.Roster.Concat(block.id)
-	chain.Blocks = append(chain.Blocks, &block)
+	s.Chain.Blocks = append(s.Chain.Blocks, &block)
 
-	chainBytes, err := protobuf.Encode(&chain)
-	if err != nil {
-		return nil, err
-	}
-
-	return &StoreBlockResponse{true, chainBytes}, nil
+	return &StoreBlockResponse{true}, nil
 }
 
 func work(block *proofofloc.Block) {
@@ -158,7 +139,6 @@ func ping(b *proofofloc.Block, dest *proofofloc.Block, suite *pairing.SuiteBn256
 	randomDelay := time.Duration((rand.Intn(300-20) + 20)) * time.Millisecond
 
 	b.Latencies[dest.ID] = randomDelay
-	b.NbReplies++
 	// -----------------------------------------------------------------------------------
 
 	conn, err := network.NewTCPConn(dest.ID.Address, suite)
@@ -169,8 +149,6 @@ func ping(b *proofofloc.Block, dest *proofofloc.Block, suite *pairing.SuiteBn256
 	}
 
 	nonce := proofofloc.Nonce(rand.Int())
-
-	b.Nonces[dest.ID] = nonce
 
 	_, err1 := conn.Send(proofofloc.PingMsg{ID: b.ID, Nonce: nonce, IsReply: false, StartingTime: time.Now()})
 
@@ -184,7 +162,7 @@ func ping(b *proofofloc.Block, dest *proofofloc.Block, suite *pairing.SuiteBn256
 }
 
 //pingListen listens for pings and pongs from other validators and handles them accordingly
-func pingListen(b *proofofloc.Block, c network.Conn) {
+func pingListen(b *proofofloc.Block, c network.Conn, nonces map[*network.ServerIdentity]proofofloc.Nonce, nbReplies *int) {
 
 	env, err := c.Receive()
 
@@ -202,11 +180,11 @@ func pingListen(b *proofofloc.Block, c network.Conn) {
 			c.Send(proofofloc.PingMsg{ID: b.ID, Nonce: Msg.Nonce, IsReply: true, StartingTime: Msg.StartingTime})
 		} else {
 			//Case 2: someone replies to our ping -> check return time
-			if Msg.IsReply && b.Nonces[Msg.ID] == Msg.Nonce {
+			if Msg.IsReply && nonces[Msg.ID] == Msg.Nonce {
 
 				latency := time.Since(Msg.StartingTime)
 				b.Latencies[Msg.ID] = latency
-				b.NbReplies++
+				*nbReplies++
 
 			}
 		}
@@ -226,7 +204,9 @@ func min(a, b int) int {
 func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
 	s := &BLSCoSiService{
 		ServiceProcessor: onet.NewServiceProcessor(c),
+		Chain:            &proofofloc.Chain{Blocks: make([]*proofofloc.Block, 0), BucketName: []byte("proofoflocBlocks")},
 	}
+
 	err := s.RegisterHandler(s.SignatureRequest)
 	if err != nil {
 		log.Error(err, "Couldn't register handler:")

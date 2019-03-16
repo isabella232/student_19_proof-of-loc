@@ -1,7 +1,6 @@
 package proofofloc
 
 import (
-	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/network"
 	"time"
 )
@@ -13,13 +12,10 @@ type Nonce int
 type Block struct {
 	ID        *network.ServerIdentity
 	Latencies map[*network.ServerIdentity]time.Duration
-	Nonces    map[*network.ServerIdentity]Nonce
-	NbReplies int
 }
 
 //Chain represents a list of blocks that have joined the system
 type Chain struct {
-	Roster     *onet.Roster
 	Blocks     []*Block
 	BucketName []byte
 }

@@ -22,7 +22,7 @@ func NewClient() *Client {
 	return &Client{Client: onet.NewClient(cothority.Suite, ServiceName)}
 }
 
-// SignatureRequest sends a CoSi sign request to the Cothority defined by the given
+// SignatureRequest sends a BLSCoSi sign request to the Cothority defined by the given
 // Roster
 func (c *Client) SignatureRequest(r *onet.Roster, msg []byte) (*SignatureResponse, error) {
 	serviceReq := &SignatureRequest{
@@ -49,18 +49,19 @@ ProposeNewBlock creates a new validator with given address and public key
 Every time a new node joins the identity chain, i.e., creates a block, it uses the BLSCoSiService to have the block
 signed by a majority, and then distributes it to other nodes. For now, nodes can join without doing any “work”,
 but later we might add a “work” function, either computing a hash preimage like in Bitcoin or smth else.
-In your design though, you can already take such an extension into account.
 
 */
-func (c *Client) ProposeNewBlock(id *network.ServerIdentity, chain *proofofloc.Chain) (*proofofloc.Block, *proofofloc.Chain, error) {
+func (c *Client) ProposeNewBlock(id *network.ServerIdentity, roster *onet.Roster) error {
 
 	latencies := make(map[*network.ServerIdentity]time.Duration)
-	pending := make(map[*network.ServerIdentity]proofofloc.Nonce)
+	//pending := make(map[*network.ServerIdentity]proofofloc.Nonce)
+
+	nbReplies := 0
 
 	//create new block
-	newBlock := &proofofloc.Block{ID: id, Latencies: latencies, Nonces: pending, NbReplies: 0}
+	newBlock := &proofofloc.Block{ID: id, Latencies: latencies}
 
-	//get ping times from nodes
+	//get ping times from nodes USE UDP ADD NONCE IN DATA -> 16byte + signed message in reply
 
 	//-> set up listening: disabled for now
 	/*
@@ -74,63 +75,58 @@ func (c *Client) ProposeNewBlock(id *network.ServerIdentity, chain *proofofloc.C
 	*/
 
 	// send pings
-	nbPings := min(nbPingsNeeded, len(chain.Blocks))
+	nbPings := min(nbPingsNeeded, len(roster.List))
 
 	//for now just ping the first ones
 	for i := 0; i < nbPings; i++ {
 		//newBlock.Ping(c.blocks[i], c.suite) --for now just random delay
 		randomDelay := time.Duration((rand.Intn(300-20) + 20)) * time.Millisecond
 
-		newBlock.Latencies[chain.Blocks[i].ID] = randomDelay
-		newBlock.NbReplies++
+		newBlock.Latencies[roster.List[i]] = randomDelay
+		nbReplies++
 	}
 
 	//wait till all reply
-	for newBlock.NbReplies < nbPings {
+	for nbReplies < nbPings {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	return c.storeBlock(newBlock, chain)
+	return c.storeBlock(newBlock, roster)
 
 }
 
-func (c *Client) storeBlock(block *proofofloc.Block, chain *proofofloc.Chain) (*proofofloc.Block, *proofofloc.Chain, error) {
+func (c *Client) storeBlock(block *proofofloc.Block, roster *onet.Roster) error {
 
 	blockBytes, err := protobuf.Encode(block)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	chainBytes, err := protobuf.Encode(chain)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	c.SignatureRequest(chain.Roster, blockBytes)
+	c.SignatureRequest(roster, blockBytes)
 
 	storageRequest := &StoreBlockRequest{
-		Chain: chainBytes,
-		Block: blockBytes,
+		Roster: roster,
+		Block:  blockBytes,
 	}
 
-	if len(chain.Roster.List) == 0 {
-		return nil, nil, errors.New("Got an empty roster-list")
+	if len(roster.List) == 0 {
+		return errors.New("Got an empty roster-list")
 	}
 
-	dst := chain.Roster.List[0]
+	dst := roster.List[0]
 
 	log.Lvl1("Sending message to", dst)
 	reply := &StoreBlockResponse{}
 	err = c.SendProtobuf(dst, storageRequest, reply)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	finalChain := proofofloc.Chain{}
-	err = protobuf.Decode(reply.Chain, &finalChain)
-	if err != nil {
-		return nil, nil, err
+	success := reply.BlockAdded
+
+	if !success {
+		return errors.New("Block not successfully added")
 	}
 
-	return block, &finalChain, nil
+	return nil
 }
