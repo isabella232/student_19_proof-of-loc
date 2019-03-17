@@ -8,10 +8,7 @@ import (
 /*ApproximateDistance is a function to approximate the distance between two given nodes, e.g.,
 node A wants to approximate the distance between nodes B and C. Node A relies on the information
 in the blockchain about distances to B, C, between B and C and its own estimations to B and C,
-applies triangularization and computes an estimate of the distance. Test it initially by assuming
-all nodes are honest, each node adds in the blockchain x distances from itself to other x nodes,
-where these x nodes are randomly chosen. You can assume for now that there’s a publicly known source
-of randomness that nodes use. Check the results by varying the number x and the total number of nodes N.*/
+applies triangularization and computes an estimate of the distance. */
 func (A *Block) ApproximateDistance(B *Block, C *Block, delta time.Duration) (time.Duration, error) {
 
 	aToB, aToBKnown := A.Latencies[B.ID]
