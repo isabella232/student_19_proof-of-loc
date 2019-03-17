@@ -2,6 +2,7 @@ package proofofloc
 
 import (
 	"errors"
+	"strconv"
 	"time"
 )
 
@@ -21,8 +22,8 @@ func (A *Block) ApproximateDistance(B *Block, C *Block, delta time.Duration) (ti
 	cToB, cToBKnown := C.Latencies[B.ID]
 
 	if cToBKnown && bToCKnown {
-		if time.Duration(bToC-cToB) > delta {
-			return time.Duration(0), errors.New("B and C contradictory")
+		if time.Duration(bToC-cToB) > delta || time.Duration(cToB-bToC) > delta {
+			return time.Duration(0), errors.New("Distances contradictory: " + strconv.Itoa(int(time.Duration(bToC-cToB))))
 		}
 		return time.Duration((cToB + bToC) / 2), nil
 	}
@@ -36,40 +37,29 @@ func (A *Block) ApproximateDistance(B *Block, C *Block, delta time.Duration) (ti
 	}
 
 	if aToBKnown && bToAKnown {
-		if time.Duration(aToB-bToA) > delta {
-			return time.Duration(0), errors.New("A and B contradictory")
+		if time.Duration(aToB-bToA) > delta || time.Duration(bToA-aToB) > delta {
+			return time.Duration(0), errors.New("Distances contradictory: " + strconv.Itoa(int(time.Duration(aToB-bToA))))
 		}
 
 		avgAB := (aToB + bToA) / 2
 
 		if aToCKnown && cToAKnown {
-			if time.Duration(aToC-cToA) > delta {
-				return time.Duration(0), errors.New("A and C contradictory")
+			if time.Duration(aToC-cToA) > delta || time.Duration(cToA-aToC) > delta {
+				return time.Duration(0), errors.New("Distances contradictory: " + strconv.Itoa(int(time.Duration(aToC-cToA))))
 			}
 			avgAC := (cToA + aToC) / 2
 
-			return pythagoras(avgAB, avgAC), nil
-
-		}
-
-		if aToCKnown && cToAKnown {
-			if time.Duration(aToC-cToA) > delta {
-				return time.Duration(0), errors.New("A and C contradictory")
-			}
-
-			avgAC := (cToA + aToC) / 2
-
-			return pythagoras(avgAB, avgAC), nil
+			return Pythagoras(avgAB, avgAC), nil
 
 		}
 
 		if aToCKnown && !cToAKnown {
-			return pythagoras(avgAB, aToC), nil
+			return Pythagoras(avgAB, aToC), nil
 
 		}
 
 		if !aToCKnown && cToAKnown {
-			return pythagoras(avgAB, cToA), nil
+			return Pythagoras(avgAB, cToA), nil
 
 		}
 
@@ -77,23 +67,23 @@ func (A *Block) ApproximateDistance(B *Block, C *Block, delta time.Duration) (ti
 
 	if bToAKnown && !aToBKnown {
 		if aToCKnown && cToAKnown {
-			if time.Duration(aToC-cToA) > delta {
-				return time.Duration(0), errors.New("A and C contradictory")
+			if time.Duration(aToC-cToA) > delta || time.Duration(cToA-aToC) > delta {
+				return time.Duration(0), errors.New("Distances contradictory: " + strconv.Itoa(int(time.Duration(aToC-cToA))))
 			}
 
 			avgAC := (cToA + aToC) / 2
 
-			return pythagoras(bToA, avgAC), nil
+			return Pythagoras(bToA, avgAC), nil
 
 		}
 
 		if aToCKnown && !cToAKnown {
-			return pythagoras(bToA, aToC), nil
+			return Pythagoras(bToA, aToC), nil
 
 		}
 
 		if !aToCKnown && cToAKnown {
-			return pythagoras(bToA, cToA), nil
+			return Pythagoras(bToA, cToA), nil
 
 		}
 
@@ -102,23 +92,23 @@ func (A *Block) ApproximateDistance(B *Block, C *Block, delta time.Duration) (ti
 	if !bToAKnown && aToBKnown {
 
 		if aToCKnown && cToAKnown {
-			if time.Duration(aToC-cToA) > delta {
-				return time.Duration(0), errors.New("A and C contradictory")
+			if time.Duration(aToC-cToA) > delta || time.Duration(cToA-aToC) > delta {
+				return time.Duration(0), errors.New("Distances contradictory: " + strconv.Itoa(int(time.Duration(aToC-cToA))))
 			}
 
 			avgAC := (cToA + aToC) / 2
 
-			return pythagoras(aToB, avgAC), nil
+			return Pythagoras(aToB, avgAC), nil
 
 		}
 
 		if aToCKnown && !cToAKnown {
-			return pythagoras(aToB, aToC), nil
+			return Pythagoras(aToB, aToC), nil
 
 		}
 
 		if !aToCKnown && cToAKnown {
-			return pythagoras(aToB, cToA), nil
+			return Pythagoras(aToB, cToA), nil
 
 		}
 
@@ -128,6 +118,8 @@ func (A *Block) ApproximateDistance(B *Block, C *Block, delta time.Duration) (ti
 
 }
 
-func pythagoras(p1 time.Duration, p2 time.Duration) time.Duration {
+//Pythagoras estimates the distance between two points with known distances to a common third point b using the Pythagorean theorem
+//Since the angle between the three points is between 0 and 180 degrees, the function assumes an average angle of 90 degreess
+func Pythagoras(p1 time.Duration, p2 time.Duration) time.Duration {
 	return ((p1 ^ 2) + (p2 ^ 2)) ^ (1 / 2)
 }
