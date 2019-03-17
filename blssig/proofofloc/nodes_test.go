@@ -141,3 +141,19 @@ func TestApproximateDistanceIncompleteInformation(t *testing.T) {
 	require.Equal(t, d12, expectedD12)
 
 }
+
+func TestApproximateDistanceMissingInformation(t *testing.T) {
+
+	N := 5
+	x := 1
+
+	chain := initChain(N, x, accurate)
+
+	dist, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[3], chain.Blocks[4], 0)
+
+	log.Print("Here")
+	log.Print(dist)
+
+	require.NotNil(t, err, "Should not have sufficient information to approximate distance")
+
+}
