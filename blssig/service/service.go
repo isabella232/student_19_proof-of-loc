@@ -8,13 +8,11 @@ import (
 	"github.com/dedis/student_19_proof-of-loc/blssig/protocol"
 	uuid "github.com/satori/go.uuid"
 	"go.dedis.ch/cothority/v3/messaging"
-	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
 	"go.dedis.ch/protobuf"
 	bbolt "go.etcd.io/bbolt"
-	"math/rand"
 	"time"
 )
 
@@ -26,8 +24,6 @@ import (
 const ServiceName = "BLSCoSiService"
 
 const protoName = "blscosiproto"
-
-const nbPingsNeeded = 5
 
 var serviceID onet.ServiceID
 
@@ -125,80 +121,6 @@ func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResp
 
 func work(block *proofofloc.Block) {
 
-}
-
-/*Ping allows a validator node to ping another node
-
-The ping function is, for now, a random delay between 20 ms and 300 ms.
-
-When node a pings node b, node a sends a message “ping” to node b (using onet) and node b replies with “pong” within a random delay time
-*/
-func ping(b *proofofloc.Block, dest *proofofloc.Block, suite *pairing.SuiteBn256) {
-
-	//get random time delay between 20 and 300 ms - for now, just return this ----------------------------------------
-	randomDelay := time.Duration((rand.Intn(300-20) + 20)) * time.Millisecond
-
-	b.Latencies[dest.ID] = randomDelay
-	// -----------------------------------------------------------------------------------
-
-	conn, err := network.NewTCPConn(dest.ID.Address, suite)
-
-	if err != nil {
-		log.Error(err, "Couldn't create new TCP connection:")
-		return
-	}
-
-	nonce := proofofloc.Nonce(rand.Int())
-
-	_, err1 := conn.Send(proofofloc.PingMsg{ID: b.ID, Nonce: nonce, IsReply: false, StartingTime: time.Now()})
-
-	if err1 != nil {
-		log.Error(err, "Couldn't send ping message:")
-		return
-	}
-
-	conn.Close()
-
-}
-
-//pingListen listens for pings and pongs from other validators and handles them accordingly
-func pingListen(b *proofofloc.Block, c network.Conn, nonces map[*network.ServerIdentity]proofofloc.Nonce, nbReplies *int) {
-
-	env, err := c.Receive()
-
-	if err != nil {
-		log.Error(err, "Couldn't send receive message from connection:")
-		return
-	}
-
-	//Filter for the two types of messages we care about
-	Msg, isPing := env.Msg.(proofofloc.PingMsg)
-
-	// Case 1: someone pings ups -> reply with pong and control values
-	if isPing {
-		if !Msg.IsReply {
-			c.Send(proofofloc.PingMsg{ID: b.ID, Nonce: Msg.Nonce, IsReply: true, StartingTime: Msg.StartingTime})
-		} else {
-			//Case 2: someone replies to our ping -> check return time
-			if Msg.IsReply && nonces[Msg.ID] == Msg.Nonce {
-
-				latency := time.Since(Msg.StartingTime)
-				b.Latencies[Msg.ID] = latency
-				*nbReplies++
-
-			}
-		}
-
-		c.Close()
-
-	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func newBLSCoSiService(c *onet.Context) (onet.Service, error) {

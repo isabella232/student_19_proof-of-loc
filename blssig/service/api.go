@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const nbPingsNeeded = 5
+
 // Client is a structure to communicate with the BLSCoSi service
 type Client struct {
 	*onet.Client
@@ -93,6 +95,13 @@ func (c *Client) ProposeNewBlock(id *network.ServerIdentity, roster *onet.Roster
 
 	return c.storeBlock(newBlock, roster)
 
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (c *Client) storeBlock(block *proofofloc.Block, roster *onet.Roster) error {

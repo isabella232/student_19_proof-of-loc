@@ -94,8 +94,8 @@ func TestApproximateDistanceAllInformation(t *testing.T) {
 
 func TestApproximateDistanceInaccurateInformation(t *testing.T) {
 
-	N := 3
-	x := 2
+	N := 6
+	x := 4
 
 	chain := initChain(N, x, inaccurate)
 
