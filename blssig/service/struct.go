@@ -2,6 +2,7 @@ package service
 
 import (
 	"go.dedis.ch/onet/v3"
+	"go.dedis.ch/onet/v3/network"
 )
 
 // SignatureRequest is what the BLSCosi service is expected to receive from clients to sign stuff
@@ -19,6 +20,17 @@ type SignatureResponse struct {
 // PropagationFunction sends the complete signature to all members of the Cothority
 type PropagationFunction struct {
 	Signature []byte
+}
+
+//CreateBlockRequest is what the BLSCosi service is expected to receive from clients to create a new block
+type CreateBlockRequest struct {
+	Roster *onet.Roster
+	ID     *network.ServerIdentity
+}
+
+//CreateBlockResponse is what a BLSCosi service replies to clients trying to create blocks
+type CreateBlockResponse struct {
+	Block []byte
 }
 
 //StoreBlockRequest is what the BLSCosi service is expected to receive from clients to add Blocks to a chain

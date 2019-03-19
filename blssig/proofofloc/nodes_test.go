@@ -6,6 +6,7 @@ import (
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
+	sigAlg "golang.org/x/crypto/ed25519"
 	"math/rand"
 	"testing"
 	"time"
@@ -40,6 +41,8 @@ func initChain(N int, x int, src sourceType) *Chain {
 
 	chain := Chain{[]*Block{}, []byte("testBucket")}
 
+	pubKey, _, _ := sigAlg.GenerateKey(nil)
+
 	for i := 0; i < N; i++ {
 		latencies := make(map[*network.ServerIdentity]time.Duration)
 		id := el.List[i]
@@ -61,7 +64,7 @@ func initChain(N int, x int, src sourceType) *Chain {
 
 			}
 		}
-		chain.Blocks = append(chain.Blocks, &Block{id, latencies})
+		chain.Blocks = append(chain.Blocks, &Block{id, pubKey, latencies})
 	}
 
 	return &chain
@@ -78,17 +81,17 @@ func TestApproximateDistanceAllInformation(t *testing.T) {
 	d12, err := chain.Blocks[0].ApproximateDistance(chain.Blocks[1], chain.Blocks[2], 10)
 
 	require.Nil(t, err, "Error")
-	require.Equal(t, d12, 10*(1+2+1))
+	require.Equal(t, d12, time.Duration(10*(1+2+1)))
 
 	d02, err := chain.Blocks[1].ApproximateDistance(chain.Blocks[0], chain.Blocks[2], 10)
 
 	require.Nil(t, err, "Error")
-	require.Equal(t, d02, 10*(2+1))
+	require.Equal(t, d02, time.Duration(10*(2+1)))
 
 	d01, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[0], chain.Blocks[1], 10)
 
 	require.Nil(t, err, "Error")
-	require.Equal(t, d01, 10*(1+1))
+	require.Equal(t, d01, time.Duration(10*(1+1)))
 
 }
 
@@ -149,10 +152,7 @@ func TestApproximateDistanceMissingInformation(t *testing.T) {
 
 	chain := initChain(N, x, accurate)
 
-	dist, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[3], chain.Blocks[4], 0)
-
-	log.Print("Here")
-	log.Print(dist)
+	_, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[3], chain.Blocks[4], 0)
 
 	require.NotNil(t, err, "Should not have sufficient information to approximate distance")
 

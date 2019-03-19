@@ -9,6 +9,14 @@ import (
 //Nonce represents a random value to make a message unique
 type Nonce int
 
+//IncompleteBlock represents a block in process of being constructed (latencies)
+type IncompleteBlock struct {
+	BlockSkeleton *Block
+	PrivateKey    sigAlg.PrivateKey
+	Nonces        map[*network.ServerIdentity][]byte
+	NbReplies     *int
+}
+
 // Block represents a block with unique identification and a list of pings
 type Block struct {
 	ID        *network.ServerIdentity
@@ -25,15 +33,7 @@ type Chain struct {
 //PingMsg represents a message sent to "ping" another validator
 type PingMsg struct {
 	ID           *network.ServerIdentity
-	Nonce        Nonce
-	IsReply      bool
-	StartingTime time.Time
-}
-
-//PingMsgReply represents a message sent to "ping" another validator
-type PingMsgReply struct {
-	ID           *network.ServerIdentity
-	SignedNonce  []byte
+	Nonce        []byte
 	IsReply      bool
 	StartingTime time.Time
 }

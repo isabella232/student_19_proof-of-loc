@@ -8,6 +8,7 @@ import (
 	"github.com/dedis/student_19_proof-of-loc/blssig/protocol"
 	uuid "github.com/satori/go.uuid"
 	"go.dedis.ch/cothority/v3/messaging"
+	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
@@ -35,6 +36,7 @@ func init() {
 	network.RegisterMessages(&SignatureRequest{}, &SignatureResponse{})
 	network.RegisterMessage(&PropagationFunction{})
 	network.RegisterMessages(&StoreBlockRequest{}, &StoreBlockResponse{})
+	network.RegisterMessages(&CreateBlockRequest{}, &CreateBlockResponse{})
 }
 
 // BLSCoSiService is the service that handles collective signing operations
@@ -43,6 +45,7 @@ type BLSCoSiService struct {
 	propagationFunction messaging.PropagationFunc
 	propagatedSignature []byte
 	Chain               *proofofloc.Chain
+	Suite               *pairing.SuiteBn256
 }
 
 // SignatureRequest treats external requests to this service.
@@ -88,6 +91,22 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (*SignatureResp
 
 }
 
+//CreateBlock creates a new Block
+func (s *BLSCoSiService) CreateBlock(request *CreateBlockRequest) (*CreateBlockResponse, error) {
+	roster := request.Roster
+	id := request.ID
+
+	newBlock, err := proofofloc.NewBlock(id, roster, s.Suite, s.Chain)
+
+	blockBytes, err := protobuf.Encode(newBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CreateBlockResponse{blockBytes}, nil
+
+}
+
 //StoreBlock adds a block to a chain
 func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResponse, error) {
 
@@ -127,6 +146,7 @@ func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
 	s := &BLSCoSiService{
 		ServiceProcessor: onet.NewServiceProcessor(c),
 		Chain:            &proofofloc.Chain{Blocks: make([]*proofofloc.Block, 0), BucketName: []byte("proofoflocBlocks")},
+		Suite:            pairing.NewSuiteBn256(),
 	}
 
 	err := s.RegisterHandler(s.SignatureRequest)
@@ -136,6 +156,12 @@ func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
 	}
 
 	err = s.RegisterHandler(s.StoreBlock)
+	if err != nil {
+		log.Error(err, "Couldn't register handler:")
+		return nil, err
+	}
+
+	err = s.RegisterHandler(s.CreateBlock)
 	if err != nil {
 		log.Error(err, "Couldn't register handler:")
 		return nil, err

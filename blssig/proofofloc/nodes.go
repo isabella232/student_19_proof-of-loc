@@ -1,11 +1,13 @@
 package proofofloc
 
 import (
+	"bytes"
 	"errors"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
+	"go.dedis.ch/protobuf"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"math/rand"
 	"strconv"
@@ -14,9 +16,10 @@ import (
 
 const nbPingsNeeded = 5
 
-func newBlock(id *network.ServerIdentity, roster *onet.Roster, suite network.Suite) (*Block, error) {
+//NewBlock creates a new Block, gets latencies for it and returns
+func NewBlock(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.SuiteBn256, chain *Chain) (*Block, error) {
 	latencies := make(map[*network.ServerIdentity]time.Duration)
-	//pending := make(map[*network.ServerIdentity]proofofloc.Nonce)
+	pending := make(map[*network.ServerIdentity][]byte)
 
 	nbReplies := 0
 
@@ -24,6 +27,7 @@ func newBlock(id *network.ServerIdentity, roster *onet.Roster, suite network.Sui
 
 	//create new block
 	newBlock := &Block{ID: id, PublicKey: pubKey, Latencies: latencies}
+	newBlockBuilder := &IncompleteBlock{BlockSkeleton: newBlock, PrivateKey: privKey, Nonces: pending, NbReplies: &nbReplies}
 
 	//get ping times from nodes USE UDP ADD NONCE IN DATA -> 16byte + signed message in reply
 
@@ -35,16 +39,14 @@ func newBlock(id *network.ServerIdentity, roster *onet.Roster, suite network.Sui
 		return nil, err
 	}
 
-	listener.Listen(newBlock.pingListen)
+	listener.Listen(newBlockBuilder.pingListen)
 
 	// send pings
 	nbPings := min(nbPingsNeeded, len(roster.List))
 
 	//for now just ping the first ones
 	for i := 0; i < nbPings; i++ {
-		newBlock.ping(c.blocks[i], c.suite)
-		newBlock.Latencies[roster.List[i]] = randomDelay
-		nbReplies++
+		newBlock.ping(chain.Blocks[i], suite)
 	}
 
 	//wait till all reply
@@ -197,8 +199,12 @@ func (A *Block) ping(dest *Block, suite *pairing.SuiteBn256) {
 	}
 
 	nonce := Nonce(rand.Int())
+	nonceBytes, err := protobuf.Encode(nonce)
+	if err != nil {
+		return
+	}
 
-	_, err1 := conn.Send(PingMsg{ID: A.ID, Nonce: nonce, IsReply: false, StartingTime: time.Now()})
+	_, err1 := conn.Send(PingMsg{ID: A.ID, Nonce: nonceBytes, IsReply: false, StartingTime: time.Now()})
 
 	if err1 != nil {
 		log.Error(err, "Couldn't send ping message:")
@@ -210,7 +216,7 @@ func (A *Block) ping(dest *Block, suite *pairing.SuiteBn256) {
 }
 
 //pingListen listens for pings and pongs from other validators and handles them accordingly
-func (A *Block) pingListen(c network.Conn, nonces map[*network.ServerIdentity]Nonce, nbReplies *int) {
+func (BlockBuilder *IncompleteBlock) pingListen(c network.Conn) {
 
 	env, err := c.Receive()
 
@@ -226,15 +232,14 @@ func (A *Block) pingListen(c network.Conn, nonces map[*network.ServerIdentity]No
 	if isPing {
 		if !Msg.IsReply {
 
-			signedNonce := sigAlg.Sign(A.ID.GetPrivate(), Msg.Nonce)
-			c.Send(PingMsg{ID: A.ID, Nonce: Msg.Nonce, IsReply: true, StartingTime: Msg.StartingTime})
+			signedNonce := sigAlg.Sign(BlockBuilder.PrivateKey, Msg.Nonce)
+			c.Send(PingMsg{ID: BlockBuilder.BlockSkeleton.ID, Nonce: signedNonce, IsReply: true, StartingTime: Msg.StartingTime})
 		} else {
 			//Case 2: someone replies to our ping -> check return time
-			if Msg.IsReply && nonces[Msg.ID] == Msg.Nonce {
-
+			if Msg.IsReply && bytes.Compare(BlockBuilder.Nonces[Msg.ID], Msg.Nonce) == 0 {
 				latency := time.Since(Msg.StartingTime)
-				A.Latencies[Msg.ID] = latency
-				*nbReplies++
+				BlockBuilder.BlockSkeleton.Latencies[Msg.ID] = latency
+				*BlockBuilder.NbReplies++
 
 			}
 		}

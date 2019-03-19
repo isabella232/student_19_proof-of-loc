@@ -2,14 +2,10 @@ package service
 
 import (
 	"errors"
-	"github.com/dedis/student_19_proof-of-loc/blssig/proofofloc"
 	"go.dedis.ch/cothority/v3"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
-	"go.dedis.ch/protobuf"
-	"math/rand"
-	"time"
 )
 
 const nbPingsNeeded = 5
@@ -55,76 +51,37 @@ but later we might add a “work” function, either computing a hash preimage l
 */
 func (c *Client) ProposeNewBlock(id *network.ServerIdentity, roster *onet.Roster) error {
 
-	latencies := make(map[*network.ServerIdentity]time.Duration)
-	//pending := make(map[*network.ServerIdentity]proofofloc.Nonce)
-
-	nbReplies := 0
-
-	//create new block
-	newBlock := &proofofloc.Block{ID: id, Latencies: latencies}
-
-	//get ping times from nodes USE UDP ADD NONCE IN DATA -> 16byte + signed message in reply
-
-	//-> set up listening: disabled for now
-	/*
-		listener, err := network.NewTCPListener(id.Address, chain.suite)
-		if err != nil {
-			log.Error(err, "Couldn't create listener:")
-			return nil, err
-		}
-
-		listener.Listen(newBlock.pingListen)
-	*/
-
-	// send pings
-	nbPings := min(nbPingsNeeded, len(roster.List))
-
-	//for now just ping the first ones
-	for i := 0; i < nbPings; i++ {
-		//newBlock.Ping(c.blocks[i], c.suite) --for now just random delay
-		randomDelay := time.Duration((rand.Intn(300-20) + 20)) * time.Millisecond
-
-		newBlock.Latencies[roster.List[i]] = randomDelay
-		nbReplies++
-	}
-
-	//wait till all reply
-	for nbReplies < nbPings {
-		time.Sleep(1 * time.Millisecond)
-	}
-
-	return c.storeBlock(newBlock, roster)
-
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func (c *Client) storeBlock(block *proofofloc.Block, roster *onet.Roster) error {
-
-	blockBytes, err := protobuf.Encode(block)
-	if err != nil {
-		return err
-	}
-
-	c.SignatureRequest(roster, blockBytes)
-
-	storageRequest := &StoreBlockRequest{
-		Roster: roster,
-		Block:  blockBytes,
-	}
-
 	if len(roster.List) == 0 {
 		return errors.New("Got an empty roster-list")
 	}
 
 	dst := roster.List[0]
 
-	log.Lvl1("Sending message to", dst)
+	newBlockRequest := &CreateBlockRequest{
+		Roster: roster,
+		ID:     id,
+	}
+
+	log.Lvl1("Sending block creation request message to", dst)
+	createBlockReply := &CreateBlockResponse{}
+	err := c.SendProtobuf(dst, newBlockRequest, createBlockReply)
+	if err != nil {
+		return err
+	}
+
+	newBlockBytes := createBlockReply.Block
+
+	sigReply, err := c.SignatureRequest(roster, newBlockBytes)
+	if err != nil {
+		return err
+	}
+
+	storageRequest := &StoreBlockRequest{
+		Roster: roster,
+		Block:  sigReply.Signature,
+	}
+
+	log.Lvl1("Sending storage request message to", dst)
 	reply := &StoreBlockResponse{}
 	err = c.SendProtobuf(dst, storageRequest, reply)
 	if err != nil {
