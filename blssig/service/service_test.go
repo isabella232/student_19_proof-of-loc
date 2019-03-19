@@ -95,8 +95,6 @@ func TestNewBlockApi(t *testing.T) {
 
 	log.SetDebugVisible(1)
 
-	//var err error
-
 	client := NewClient()
 
 	local := onet.NewTCPTest(tSuite)

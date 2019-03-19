@@ -14,6 +14,7 @@ type IncompleteBlock struct {
 	BlockSkeleton *Block
 	PrivateKey    sigAlg.PrivateKey
 	Nonces        map[*network.ServerIdentity][]byte
+	PublicKeys    map[*network.ServerIdentity]sigAlg.PublicKey
 	NbReplies     *int
 }
 
