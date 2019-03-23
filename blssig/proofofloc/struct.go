@@ -47,15 +47,10 @@ type PingMsg struct {
 	DstIP string
 	SeqNb int
 
-	PublicKey sigAlg.PublicKey
-	SrcNonce  int
-	DstNonce  int
-
-	SignedContent []byte
+	content []byte
 }
 
 type PingMsg1 struct {
-	*PingMsg
 	PublicKey sigAlg.PublicKey
 	SrcNonce  Nonce
 	Timestamp time.Time
@@ -63,7 +58,6 @@ type PingMsg1 struct {
 }
 
 type PingMsg2 struct {
-	*PingMsg
 	PublicKey sigAlg.PublicKey
 	SrcNonce  Nonce
 	DstNonce  Nonce
@@ -72,7 +66,6 @@ type PingMsg2 struct {
 }
 
 type PingMsg3 struct {
-	*PingMsg
 	PublicKey     sigAlg.PublicKey
 	SrcNonce      Nonce
 	DstNonce      Nonce
@@ -83,7 +76,6 @@ type PingMsg3 struct {
 }
 
 type PingMsg4 struct {
-	*PingMsg
 	PublicKey           sigAlg.PublicKey
 	SrcNonce            Nonce
 	DstNonce            Nonce
@@ -95,7 +87,6 @@ type PingMsg4 struct {
 }
 
 type PingMsg5 struct {
-	*PingMsg
 	PublicKey           sigAlg.PublicKey
 	DstNonce            Nonce
 	Timestamp           time.Time
