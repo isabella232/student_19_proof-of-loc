@@ -13,57 +13,67 @@ import (
 	"time"
 )
 
-const nbPingsNeeded = 5
+const nbLatencies = 5
 
-//NewBlock creates a new Block, gets latencies for it and returns
-func NewBlock(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.SuiteBn256, chain *Chain) (*Block, error) {
-
-	latencies := make(map[*network.ServerIdentity]time.Duration)
-	pending := make(map[*network.ServerIdentity][]byte)
-	publicKeys := make(map[*network.ServerIdentity]sigAlg.PublicKey)
-
-	for i := 0; i < len(chain.Blocks); i++ {
-		publicKeys[chain.Blocks[i].ID] = chain.Blocks[i].PublicKey
-	}
-
-	nbReplies := 0
+//NewNode creates a new Node, initializes a new Block for the chain, and gets latencies for it
+func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.SuiteBn256, chain *Chain) (*Node, error) {
 
 	pubKey, privKey, err := sigAlg.GenerateKey(nil)
 
+	nodeID := &NodeID{id, pubKey}
+
+	latencies := make(map[*NodeID]Latency)
+
 	//create new block
-	newBlock := &Block{ID: id, PublicKey: pubKey, Latencies: latencies}
-	newBlockBuilder := &IncompleteBlock{
-		BlockSkeleton: newBlock,
-		PrivateKey:    privKey,
-		Nonces:        pending,
-		PublicKeys:    publicKeys,
-		NbReplies:     &nbReplies,
+	newBlock := &Block{ID: nodeID, Latencies: latencies}
+
+	newNode := &Node{
+		ID:                      nodeID,
+		PrivateKey:              privKey,
+		LatenciesInConstruction: make([]LatencyConstructor, 0),
+		BlockSkeleton:           newBlock,
 	}
 
 	//get ping times from nodes USE UDP ADD NONCE IN DATA -> 16byte + signed message in reply
 
-	listener, err := network.NewTCPListener(id.Address, suite)
-	if err != nil {
-		log.Error(err, "Couldn't create listener:")
-		return nil, err
-	}
-
-	listener.Listen(newBlockBuilder.pingListen)
+	initConnection(id.Address, suite, newNode)
 
 	// send pings
-	nbPings := min(nbPingsNeeded, len(roster.List))
+	nbLatenciesNeeded := min(nbLatencies, len(roster.List))
 
 	//for now just ping the first ones
-	for i := 0; i < nbPings; i++ {
-		newBlockBuilder.ping(chain.Blocks[i], suite)
+	for i := 0; i < nbLatenciesNeeded; i++ {
+		newNode.LatenciesInConstruction[i] = LatencyConstructor{
+			StartedLocally: true,
+			DstID:          chain.Blocks[i].ID,
+			Messages:       make([]PingMsg, 3),
+			Nonces:         make([]byte, 2),
+			Timestamps:     make([]time.Time, 2),
+			ClockSkews:     make([]time.Duration, 2),
+			latency:        0,
+		}
 	}
 
+	nbReplies := 0
 	//wait till all reply
-	for nbReplies < nbPings {
+	for len(newBlock.Latencies) < nbLatenciesNeeded {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	return newBlock, nil
+	return newNode, nil
+
+}
+
+func initConnection(address network.Address, suite *pairing.SuiteBn256, newNode *Node) {
+	//get ping times from nodes USE UDP ADD NONCE IN DATA -> 16byte + signed message in reply
+
+	listener, err := network.NewTCPListener(address, suite)
+	if err != nil {
+		log.Error(err, "Couldn't create listener:")
+		return
+	}
+
+	listener.Listen(newNode.pingListen)
 
 }
 
@@ -74,20 +84,28 @@ func min(a, b int) int {
 	return b
 }
 
+func (A *Block) getLatency(B *Block) (time.Duration, bool) {
+	latencyStruct, isPresent := A.Latencies[B.ID]
+	if !isPresent {
+		return 0, false
+	}
+	return latencyStruct.Latency, true
+}
+
 /*ApproximateDistance is a function to approximate the distance between two given nodes, e.g.,
 node A wants to approximate the distance between nodes B and C. Node A relies on the information
 in the blockchain about distances to B, C, between B and C and its own estimations to B and C,
 applies triangularization and computes an estimate of the distance. */
 func (A *Block) ApproximateDistance(B *Block, C *Block, delta time.Duration) (time.Duration, error) {
 
-	aToB, aToBKnown := A.Latencies[B.ID]
-	bToA, bToAKnown := B.Latencies[A.ID]
+	aToB, aToBKnown := A.getLatency(B)
+	bToA, bToAKnown := B.getLatency(A)
 
-	aToC, aToCKnown := A.Latencies[C.ID]
-	cToA, cToAKnown := C.Latencies[A.ID]
+	aToC, aToCKnown := A.getLatency(C)
+	cToA, cToAKnown := C.getLatency(A)
 
-	bToC, bToCKnown := B.Latencies[C.ID]
-	cToB, cToBKnown := C.Latencies[B.ID]
+	bToC, bToCKnown := B.getLatency(C)
+	cToB, cToBKnown := C.getLatency(B)
 
 	if cToBKnown && bToCKnown {
 		if time.Duration(bToC-cToB) > delta || time.Duration(cToB-bToC) > delta {
@@ -198,25 +216,25 @@ The ping function is, for now, a random delay between 20 ms and 300 ms.
 
 When node a pings node b, node a sends a message “ping” to node b (using onet) and node b replies with “pong” within a random delay time
 */
-func (BlockBuilder *IncompleteBlock) ping(dest *Block, suite *pairing.SuiteBn256) {
+func (Node *Node) ping(dest *Node, suite *pairing.SuiteBn256) {
 
-	conn, err := network.NewTCPConn(dest.ID.Address, suite)
+	conn, err := network.NewTCPConn(dest.ID.ServerID.Address, suite)
 
 	if err != nil {
 		log.Error(err, "Couldn't create new TCP connection:")
 		return
 	}
 
-	nonce := Nonce(rand.Int())
-	nonceBytes, err := protobuf.Encode(nonce)
+	nonceVal := rand.Int()
+	nonceBytes, err := protobuf.Encode(nonceVal)
 	if err != nil {
 		return
 	}
 
 	//save nonce
-	BlockBuilder.Nonces[dest.ID] = nonceBytes
+	Node.Nonces[dest.ID] = nonceBytes
 
-	_, err1 := conn.Send(PingMsg{ID: BlockBuilder.BlockSkeleton.ID, Nonce: nonceBytes, IsReply: false, StartingTime: time.Now()})
+	_, err1 := conn.Send(PingMsg{ID: Node.BlockSkeleton.ID, Nonce: nonceBytes, IsReply: false, StartingTime: time.Now()})
 
 	if err1 != nil {
 		log.Error(err, "Couldn't send ping message:")
@@ -228,7 +246,7 @@ func (BlockBuilder *IncompleteBlock) ping(dest *Block, suite *pairing.SuiteBn256
 }
 
 //pingListen listens for pings and pongs from other validators and handles them accordingly
-func (BlockBuilder *IncompleteBlock) pingListen(c network.Conn) {
+func (Node *Node) pingListen(c network.Conn) {
 
 	env, err := c.Receive()
 
@@ -246,19 +264,19 @@ func (BlockBuilder *IncompleteBlock) pingListen(c network.Conn) {
 
 			//CHECK TIMESTAMP FOR AGE of message
 
-			signedNonce := sigAlg.Sign(BlockBuilder.PrivateKey, Msg.Nonce)
+			signedNonce := sigAlg.Sign(Node.PrivateKey, Msg.Nonce)
 			//sign return message, check time
-			c.Send(PingMsg{ID: BlockBuilder.BlockSkeleton.ID, Nonce: signedNonce, IsReply: true, StartingTime: Msg.StartingTime})
+			c.Send(PingMsg{ID: Node.BlockSkeleton.ID, Nonce: signedNonce, IsReply: true, StartingTime: Msg.StartingTime})
 		} else {
 			//Case 2: someone replies to our ping -> check return time
 			if Msg.IsReply {
 
-				nonceCorrect := sigAlg.Verify(BlockBuilder.PublicKeys[Msg.ID], Msg.Nonce, BlockBuilder.Nonces[Msg.ID])
+				nonceCorrect := sigAlg.Verify(Node.PublicKeys[Msg.ID], Msg.Nonce, Node.Nonces[Msg.ID])
 				if nonceCorrect {
 
 					latency := time.Since(Msg.StartingTime) //save start time locally
-					BlockBuilder.BlockSkeleton.Latencies[Msg.ID] = latency
-					*BlockBuilder.NbReplies++
+					Node.BlockSkeleton.Latencies[Msg.ID] = latency
+					*Node.NbReplies++
 				}
 
 			}
