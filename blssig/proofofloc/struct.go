@@ -13,9 +13,10 @@ type Nonce int
 type IncompleteBlock struct {
 	BlockSkeleton *Block
 	PrivateKey    sigAlg.PrivateKey
-	Nonces        map[*network.ServerIdentity][]byte
-	PublicKeys    map[*network.ServerIdentity]sigAlg.PublicKey
-	NbReplies     *int
+
+	Nonces     map[*network.ServerIdentity][]byte
+	PublicKeys map[*network.ServerIdentity]sigAlg.PublicKey
+	NbReplies  *int
 }
 
 // Block represents a block with unique identification and a list of pings

@@ -1,7 +1,6 @@
 package proofofloc
 
 import (
-	"bytes"
 	"errors"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
@@ -245,15 +244,19 @@ func (BlockBuilder *IncompleteBlock) pingListen(c network.Conn) {
 	if isPing {
 		if !Msg.IsReply {
 
+			//CHECK TIMESTAMP FOR AGE of message
+
 			signedNonce := sigAlg.Sign(BlockBuilder.PrivateKey, Msg.Nonce)
+			//sign return message, check time
 			c.Send(PingMsg{ID: BlockBuilder.BlockSkeleton.ID, Nonce: signedNonce, IsReply: true, StartingTime: Msg.StartingTime})
 		} else {
 			//Case 2: someone replies to our ping -> check return time
 			if Msg.IsReply {
+
 				nonceCorrect := sigAlg.Verify(BlockBuilder.PublicKeys[Msg.ID], Msg.Nonce, BlockBuilder.Nonces[Msg.ID])
 				if nonceCorrect {
 
-					latency := time.Since(Msg.StartingTime)
+					latency := time.Since(Msg.StartingTime) //save start time locally
 					BlockBuilder.BlockSkeleton.Latencies[Msg.ID] = latency
 					*BlockBuilder.NbReplies++
 				}
