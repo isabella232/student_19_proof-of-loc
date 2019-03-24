@@ -29,13 +29,16 @@ func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.Sui
 
 	receiverChannel := InitListening(id.Address.NetworkAddress())
 
+	BlockChannel := make(chan Block, 1)
+
 	newNode := &Node{
 		ID:                      nodeID,
 		PrivateKey:              privKey,
 		LatenciesInConstruction: make(map[string]*LatencyConstructor),
 		BlockSkeleton:           newBlock,
 		NbLatenciesRefreshed:    0,
-		ReceptionChannel:        receiverChannel,
+		IncomingMessageChannel:  receiverChannel,
+		BlockChannel:            BlockChannel,
 	}
 
 	// send pings
@@ -197,7 +200,7 @@ func Pythagoras(p1 time.Duration, p2 time.Duration) time.Duration {
 func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, chain *Chain) {
 
 	for true {
-		newMsg := <-Node.ReceptionChannel
+		newMsg := <-Node.IncomingMessageChannel
 		msgSeqNb := newMsg.SeqNb
 
 		switch msgSeqNb {
@@ -231,6 +234,8 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, chain *Chain
 				Node.NbLatenciesRefreshed++
 
 				if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock {
+					Node.BlockChannel <- *Node.BlockSkeleton
+					Node.BlockSkeleton.Latencies = make(map[string]ConfirmedLatency)
 
 				}
 			}

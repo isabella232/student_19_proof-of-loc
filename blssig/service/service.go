@@ -4,8 +4,8 @@ package service
 import (
 	"crypto/sha256"
 	"errors"
+	"github.com/dedis/student_19_proof-of-loc/blssig/blscosiprotocol"
 	"github.com/dedis/student_19_proof-of-loc/blssig/latencyprotocol"
-	"github.com/dedis/student_19_proof-of-loc/blssig/protocol"
 	uuid "github.com/satori/go.uuid"
 	"go.dedis.ch/cothority/v3/messaging"
 	"go.dedis.ch/kyber/v3/pairing"
@@ -51,7 +51,7 @@ func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
 		return nil, err
 	}
 
-	err = s.RegisterHandler(s.StoreBlock)
+	err = s.RegisterHandler(s.CreateBlock)
 	if err != nil {
 		log.Error(err, "Couldn't register handler:")
 		return nil, err
@@ -76,10 +76,10 @@ func init() {
 	var err error
 	serviceID, err = onet.RegisterNewService(ServiceName, newBLSCoSiService)
 	log.ErrFatal(err)
-	onet.GlobalProtocolRegister(blscosiSigProtocolName, protocol.NewDefaultProtocol)
+	onet.GlobalProtocolRegister(blscosiSigProtocolName, blscosiprotocol.NewDefaultProtocol)
 	network.RegisterMessages(&SignatureRequest{}, &SignatureResponse{})
 	network.RegisterMessage(&PropagationFunction{})
-	network.RegisterMessages(&StoreBlockRequest{}, &StoreBlockResponse{})
+	network.RegisterMessages(&CreateBlockRequest{}, &CreateBlockResponse{})
 	network.RegisterMessages(&CreateNodeRequest{}, &CreateNodeResponse{})
 }
 
@@ -101,7 +101,7 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (*SignatureResp
 	}
 
 	//Set message and start signing
-	protocolInstance := pi.(*protocol.SimpleBLSCoSi)
+	protocolInstance := pi.(*blscosiprotocol.SimpleBLSCoSi)
 	protocolInstance.Message = req.Message
 
 	log.Lvl3("BLSCosi Service starting up root protocol")
@@ -145,19 +145,29 @@ func (s *BLSCoSiService) CreateNode(request *CreateNodeRequest) (*CreateNodeResp
 
 }
 
-//StoreBlock adds a block to a chain
-func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResponse, error) {
+//CreateBlock adds a block to a chain
+func (s *BLSCoSiService) CreateBlock(request *CreateBlockRequest) (*CreateBlockResponse, error) {
 
-	block := latencyprotocol.Block{}
-	err := protobuf.Decode(request.Block, &block)
+	node := latencyprotocol.Node{}
+	err := protobuf.Decode(request.Node, &node)
 	if err != nil {
 		return nil, err
 	}
+
+	node.RefreshBlock(request.Roster, s.Chain)
+
+	newBlock := <-node.BlockChannel
+
 	//do some work
-	work(&block)
+	work(&node)
+
+	blockBytes, err := protobuf.Encode(newBlock)
+	if err != nil {
+		return nil, err
+	}
 
 	h := sha256.New()
-	h.Write(request.Block)
+	h.Write(blockBytes)
 
 	//key is the hash of the block
 	key := h.Sum([]byte{})
@@ -166,17 +176,17 @@ func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResp
 	db, bucket := s.GetAdditionalBucket([]byte(s.Chain.BucketName))
 
 	db.Update(func(tx *bbolt.Tx) error {
-		tx.Bucket(bucket).Put(key, request.Block)
+		tx.Bucket(bucket).Put(key, blockBytes)
 		return nil
 	})
 
 	//chain.Roster.Concat(block.id)
-	s.Chain.Blocks = append(s.Chain.Blocks, &block)
+	s.Chain.Blocks = append(s.Chain.Blocks, &newBlock)
 
-	return &StoreBlockResponse{true}, nil
+	return &CreateBlockResponse{true}, nil
 }
 
-func work(block *latencyprotocol.Block) {
+func work(node *latencyprotocol.Node) {
 
 }
 

@@ -33,13 +33,13 @@ type CreateNodeResponse struct {
 	Node []byte
 }
 
-//StoreBlockRequest is what the BLSCosi service is expected to receive from clients to add Blocks to a chain
-type StoreBlockRequest struct {
+//CreateBlockRequest is what the BLSCosi service is expected to receive from clients to add Blocks to a chain
+type CreateBlockRequest struct {
 	Roster *onet.Roster
-	Block  []byte
+	Node   []byte
 }
 
-//StoreBlockResponse is what a BLSCosi service replies to clients trying to store blocks
-type StoreBlockResponse struct {
+//CreateBlockResponse is what a BLSCosi service replies to clients trying to store blocks
+type CreateBlockResponse struct {
 	BlockAdded bool
 }

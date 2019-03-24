@@ -34,7 +34,8 @@ type Node struct {
 	LatenciesInConstruction map[string]*LatencyConstructor
 	BlockSkeleton           *Block
 	NbLatenciesRefreshed    int
-	ReceptionChannel        <-chan PingMsg
+	IncomingMessageChannel  <-chan PingMsg
+	BlockChannel            chan Block
 }
 
 //Chain represents a list of blocks that have joined the system
