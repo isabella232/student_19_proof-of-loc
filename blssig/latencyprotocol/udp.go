@@ -1,4 +1,4 @@
-package proofofloc
+package latencyprotocol
 
 // sources: https://holwech.github.io/blog/Creating-a-simple-UDP-module/
 import (

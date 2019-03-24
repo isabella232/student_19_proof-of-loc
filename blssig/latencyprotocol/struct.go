@@ -1,4 +1,4 @@
-package proofofloc
+package latencyprotocol
 
 import (
 	"go.dedis.ch/onet/v3/network"

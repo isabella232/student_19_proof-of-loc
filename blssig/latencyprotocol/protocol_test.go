@@ -1,4 +1,4 @@
-package proofofloc
+package latencyprotocol
 
 import (
 	"github.com/stretchr/testify/require"

@@ -1,4 +1,4 @@
-package protocol
+package blscosiprotocol
 
 import (
 	"testing"

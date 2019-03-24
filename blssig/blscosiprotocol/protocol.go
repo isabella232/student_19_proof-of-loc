@@ -1,8 +1,8 @@
-package protocol
+package blscosiprotocol
 
 import (
 	"errors"
-	"github.com/dedis/student_19_proof-of-loc/blssig/proofofloc"
+	"github.com/dedis/student_19_proof-of-loc/blssig/latencyprotocol"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/onet/v3"
@@ -39,7 +39,7 @@ func NewLatencyVerificatingProtocol(n *onet.TreeNodeInstance) (onet.ProtocolInst
 	vf := func(a []byte) error {
 
 		//decode a as block struct
-		var block proofofloc.Block
+		var block latencyprotocol.Block
 		err := protobuf.Decode(a, &block)
 		if err != nil {
 			return err

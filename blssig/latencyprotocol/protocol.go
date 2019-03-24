@@ -1,4 +1,4 @@
-package proofofloc
+package latencyprotocol
 
 import (
 	"errors"
