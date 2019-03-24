@@ -68,7 +68,7 @@ type PingMsg5 struct {
 	DoubleSignedForeignLatency []byte
 }
 
-func (Node *Node) sendMessage1(dstNode *Node) {
+func (Node *Node) sendMessage1(dstNodeID *NodeID) {
 
 	nonce := Nonce(rand.Int())
 	timestamp := time.Now()
@@ -78,7 +78,7 @@ func (Node *Node) sendMessage1(dstNode *Node) {
 		Timestamp: timestamp,
 	}
 
-	_, alreadyStarted := Node.LatenciesInConstruction[string(dstNode.ID.PublicKey)]
+	_, alreadyStarted := Node.LatenciesInConstruction[string(dstNodeID.PublicKey)]
 
 	if alreadyStarted {
 		return
@@ -87,7 +87,7 @@ func (Node *Node) sendMessage1(dstNode *Node) {
 	latConstr := LatencyConstructor{
 		StartedLocally: true,
 		CurrentMsgNb:   1,
-		DstID:          dstNode.ID,
+		DstID:          dstNodeID,
 		Nonces:         make([]Nonce, 2),
 		Timestamps:     make([]time.Time, 2),
 		ClockSkews:     make([]time.Duration, 2),
@@ -97,7 +97,7 @@ func (Node *Node) sendMessage1(dstNode *Node) {
 	latConstr.Nonces[0] = nonce
 	latConstr.Timestamps[0] = timestamp
 
-	Node.LatenciesInConstruction[string(dstNode.ID.PublicKey)] = &latConstr
+	Node.LatenciesInConstruction[string(dstNodeID.PublicKey)] = &latConstr
 
 	unsigned, err := protobuf.Encode(msgContent)
 	if err != nil {
@@ -109,7 +109,7 @@ func (Node *Node) sendMessage1(dstNode *Node) {
 
 	msg := &PingMsg{
 		Src:       *Node.ID.ServerID,
-		Dst:       *dstNode.ID.ServerID,
+		Dst:       *dstNodeID.ServerID,
 		SeqNb:     1,
 		PublicKey: Node.ID.PublicKey,
 
@@ -118,42 +118,42 @@ func (Node *Node) sendMessage1(dstNode *Node) {
 	}
 
 	srcAddress := Node.ID.ServerID.Address.NetworkAddress()
-	dstAddress := dstNode.ID.ServerID.Address.NetworkAddress()
+	dstAddress := dstNodeID.ServerID.Address.NetworkAddress()
 
 	SendMessage(msg, srcAddress, dstAddress)
 
 }
 
-func (Node *Node) checkMessage1(msg PingMsg) bool {
+func (Node *Node) checkMessage1(msg *PingMsg) (*PingMsg1, bool) {
 
 	newPubKey := msg.PublicKey
 
 	_, alreadyStarted := Node.LatenciesInConstruction[string(newPubKey)]
 
 	if alreadyStarted {
-		return false
+		return nil, false
 	}
 
 	content := PingMsg1{}
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
-		return false
+		return nil, false
 	}
 
 	sigCorrect := sigAlg.Verify(newPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
-		return false
+		return nil, false
 	}
 
 	if !isFresh(content.Timestamp, freshnessDelta) {
-		return false
+		return nil, false
 	}
 
-	return true
+	return &content, true
 
 }
 
-func (Node *Node) sendMessage2(msg PingMsg, msgContent PingMsg1) {
+func (Node *Node) sendMessage2(msg *PingMsg, msgContent *PingMsg1) {
 
 	latencyConstr := &LatencyConstructor{
 		StartedLocally: false,
@@ -203,7 +203,7 @@ func (Node *Node) sendMessage2(msg PingMsg, msgContent PingMsg1) {
 
 }
 
-func (Node *Node) checkMessage2(msg PingMsg) bool {
+func (Node *Node) checkMessage2(msg *PingMsg) (*PingMsg2, bool) {
 
 	senderPubKey := msg.PublicKey
 
@@ -211,42 +211,42 @@ func (Node *Node) checkMessage2(msg PingMsg) bool {
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[string(senderPubKey)]
 
 	if !alreadyStarted {
-		return false
+		return nil, false
 	}
 
 	//extract content
 	content := PingMsg2{}
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
-		return false
+		return nil, false
 	}
 
 	//check signature
 	sigCorrect := sigAlg.Verify(senderPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
-		return false
+		return nil, false
 	}
 
 	//check freshness
 	if !isFresh(content.Timestamp, freshnessDelta) {
-		return false
+		return nil, false
 	}
 
 	//Check message 2 sent after message 1
 	if content.Timestamp.Before(latencyConstr.Timestamps[0]) {
-		return false
+		return nil, false
 	}
 
 	//check nonce
 	if content.DstNonce != latencyConstr.Nonces[0] {
-		return false
+		return nil, false
 	}
 
-	return true
+	return &content, true
 
 }
 
-func (Node *Node) sendMessage3(msg PingMsg, msgContent PingMsg2) {
+func (Node *Node) sendMessage3(msg *PingMsg, msgContent *PingMsg2) {
 
 	latencyConstr := Node.LatenciesInConstruction[string(msg.PublicKey)]
 	latencyConstr.CurrentMsgNb += 2
@@ -259,6 +259,7 @@ func (Node *Node) sendMessage3(msg PingMsg, msgContent PingMsg2) {
 	latencyConstr.ClockSkews[0] = localtime.Sub(msgContent.Timestamp)
 
 	latency := localtime.Sub(latencyConstr.Timestamps[0])
+	latencyConstr.Latency = latency
 	unsignedLatency, err := protobuf.Encode(latency)
 	signedLatency := sigAlg.Sign(Node.PrivateKey, unsignedLatency)
 
@@ -295,7 +296,7 @@ func (Node *Node) sendMessage3(msg PingMsg, msgContent PingMsg2) {
 
 }
 
-func (Node *Node) checkMessage3(msg PingMsg) bool {
+func (Node *Node) checkMessage3(msg *PingMsg) (*PingMsg3, bool) {
 
 	senderPubKey := msg.PublicKey
 
@@ -303,42 +304,42 @@ func (Node *Node) checkMessage3(msg PingMsg) bool {
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[string(senderPubKey)]
 
 	if !alreadyStarted {
-		return false
+		return nil, false
 	}
 
 	//extract content
 	content := PingMsg3{}
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
-		return false
+		return nil, false
 	}
 
 	//check signature
 	sigCorrect := sigAlg.Verify(senderPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
-		return false
+		return nil, false
 	}
 
 	//check freshness
 	if !isFresh(content.Timestamp, freshnessDelta) {
-		return false
+		return nil, false
 	}
 
 	//Check message 3 sent after message 2
 	if content.Timestamp.Before(latencyConstr.Timestamps[0]) {
-		return false
+		return nil, false
 	}
 
 	//check nonce
 	if content.DstNonce != latencyConstr.Nonces[0] {
-		return false
+		return nil, false
 	}
 
-	return true
+	return &content, true
 
 }
 
-func (Node *Node) sendMessage4(msg PingMsg, msgContent PingMsg3) {
+func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
 
 	latencyConstr := Node.LatenciesInConstruction[string(msg.PublicKey)]
 	latencyConstr.CurrentMsgNb += 2
@@ -356,6 +357,8 @@ func (Node *Node) sendMessage4(msg PingMsg, msgContent PingMsg3) {
 	}
 
 	localLatency := localtime.Sub(latencyConstr.Timestamps[0])
+
+	latencyConstr.Latency = localLatency
 
 	if !acceptableDifference(localLatency, msgContent.Latency, intervallDelta) {
 		// TODO + account for clock skew
@@ -411,7 +414,7 @@ func (Node *Node) sendMessage4(msg PingMsg, msgContent PingMsg3) {
 
 }
 
-func (Node *Node) checkMessage4(msg PingMsg) bool {
+func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
 
 	senderPubKey := msg.PublicKey
 
@@ -419,42 +422,42 @@ func (Node *Node) checkMessage4(msg PingMsg) bool {
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[string(senderPubKey)]
 
 	if !alreadyStarted {
-		return false
+		return nil, false
 	}
 
 	//extract content
 	content := PingMsg4{}
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
-		return false
+		return nil, false
 	}
 
 	//check signature
 	sigCorrect := sigAlg.Verify(senderPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
-		return false
+		return nil, false
 	}
 
 	//check freshness
 	if !isFresh(content.Timestamp, freshnessDelta) {
-		return false
+		return nil, false
 	}
 
 	//Check message 4 sent after message 3
 	if content.Timestamp.Before(latencyConstr.Timestamps[1]) {
-		return false
+		return nil, false
 	}
 
 	//check nonce
 	if content.DstNonce != latencyConstr.Nonces[1] {
-		return false
+		return nil, false
 	}
 
-	return true
+	return &content, true
 
 }
 
-func (Node *Node) sendMessage5(msg PingMsg, msgContent PingMsg4) {
+func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLatency {
 
 	latencyConstr := Node.LatenciesInConstruction[string(msg.PublicKey)]
 	latencyConstr.CurrentMsgNb += 2
@@ -465,18 +468,18 @@ func (Node *Node) sendMessage5(msg PingMsg, msgContent PingMsg4) {
 
 	if !acceptableDifference(latencyConstr.ClockSkews[0], latencyConstr.ClockSkews[1], intervallDelta) {
 		//TODO
-		return
+		return nil
 	}
 
 	if !acceptableDifference(latencyConstr.Latency, msgContent.LocalLatency, intervallDelta) {
 		// TODO + account for clock skew
-		return
+		return nil
 	}
 
 	signedForeignLatency := SignedForeignLatency{localtime, msgContent.SignedLocalLatency}
 	signedForeignLatencyBytes, err := protobuf.Encode(signedForeignLatency)
 	if err != nil {
-		return
+		return nil
 	}
 
 	doubleSignedforeignLatency := sigAlg.Sign(Node.PrivateKey, signedForeignLatencyBytes)
@@ -491,7 +494,7 @@ func (Node *Node) sendMessage5(msg PingMsg, msgContent PingMsg4) {
 	unsignedContent, err := protobuf.Encode(msg5Content)
 	if err != nil {
 		//TODO
-		return
+		return nil
 	}
 
 	signedContent := sigAlg.Sign(Node.PrivateKey, unsignedContent)
@@ -511,11 +514,17 @@ func (Node *Node) sendMessage5(msg PingMsg, msgContent PingMsg4) {
 
 	SendMessage(newMsg, srcAddress, dstAddress)
 
-	//Add msgContent.Doublesigned to block
+	newLatency := &ConfirmedLatency{
+		Latency:            latencyConstr.Latency,
+		Timestamp:          msgContent.Timestamp,
+		SignedConfirmation: msgContent.DoubleSignedForeignLatency,
+	}
+
+	return newLatency
 
 }
 
-func (Node *Node) checkMessage5(msg PingMsg) bool {
+func (Node *Node) checkMessage5(msg *PingMsg) (*ConfirmedLatency, bool) {
 
 	senderPubKey := msg.PublicKey
 
@@ -523,38 +532,44 @@ func (Node *Node) checkMessage5(msg PingMsg) bool {
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[string(senderPubKey)]
 
 	if !alreadyStarted {
-		return false
+		return nil, false
 	}
 
 	//extract content
 	content := PingMsg5{}
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
-		return false
+		return nil, false
 	}
 
 	//check signature
 	sigCorrect := sigAlg.Verify(senderPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
-		return false
+		return nil, false
 	}
 
 	//check freshness
 	if !isFresh(content.Timestamp, freshnessDelta) {
-		return false
+		return nil, false
 	}
 
 	//Check message 5 sent after message 4
 	if content.Timestamp.Before(latencyConstr.Timestamps[1]) {
-		return false
+		return nil, false
 	}
 
 	//check nonce
 	if content.DstNonce != latencyConstr.Nonces[1] {
-		return false
+		return nil, false
 	}
 
-	return true
+	newLatency := &ConfirmedLatency{
+		Latency:            latencyConstr.Latency,
+		Timestamp:          time.Now(),
+		SignedConfirmation: content.DoubleSignedForeignLatency,
+	}
+
+	return newLatency, true
 
 }
 
@@ -564,4 +579,41 @@ func isFresh(timestamp time.Time, delta time.Duration) bool {
 
 func acceptableDifference(time1 time.Duration, time2 time.Duration, delta time.Duration) bool {
 	return time1-time2 < delta && time2-time1 < delta
+}
+
+func (Node *Node) handleIncomingMessages() {
+
+	for true {
+		newMsg := <-Node.ReceptionChannel
+		msgSeqNb := newMsg.SeqNb
+
+		switch msgSeqNb {
+		case 1:
+			msgContent, messageOkay := Node.checkMessage1(&newMsg)
+			if messageOkay {
+				Node.sendMessage2(&newMsg, msgContent)
+			}
+		case 2:
+			msgContent, messageOkay := Node.checkMessage2(&newMsg)
+			if messageOkay {
+				Node.sendMessage3(&newMsg, msgContent)
+			}
+		case 3:
+			msgContent, messageOkay := Node.checkMessage3(&newMsg)
+			if messageOkay {
+				Node.sendMessage4(&newMsg, msgContent)
+			}
+		case 4:
+			msgContent, messageOkay := Node.checkMessage4(&newMsg)
+			if messageOkay {
+				Node.sendMessage5(&newMsg, msgContent)
+			}
+		case 5:
+			doubleSignedLatency, messageOkay := Node.checkMessage5(&newMsg)
+			if messageOkay {
+				Node.BlockSkeleton.Latencies[string(newMsg.PublicKey)] = *doubleSignedLatency
+			}
+		}
+
+	}
 }

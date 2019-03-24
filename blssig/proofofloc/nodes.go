@@ -16,10 +16,13 @@ const nbLatencies = 5
 func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.SuiteBn256, chain *Chain) (*Node, error) {
 
 	pubKey, privKey, err := sigAlg.GenerateKey(nil)
+	if err != nil {
+		return nil, err
+	}
 
 	nodeID := &NodeID{id, pubKey}
 
-	latencies := make(map[*NodeID]Latency)
+	latencies := make(map[string]ConfirmedLatency)
 
 	//create new block
 	newBlock := &Block{ID: nodeID, Latencies: latencies}
@@ -41,23 +44,14 @@ func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.Sui
 
 	//for now just ping the first ones
 	for i := 0; i < nbLatenciesNeeded; i++ {
-
+		newNode.sendMessage1(chain.Blocks[i].ID)
 	}
-
-	nbReplies := 0
 	//wait till all reply
 	for len(newBlock.Latencies) < nbLatenciesNeeded {
-		newNode.constructLatencies()
 		time.Sleep(1 * time.Millisecond)
 	}
 
 	return newNode, nil
-
-}
-
-func (Node *Node) constructLatencies() {
-
-	receivedMessage := <-Node.ReceptionChannel
 
 }
 
@@ -69,7 +63,7 @@ func min(a, b int) int {
 }
 
 func (A *Block) getLatency(B *Block) (time.Duration, bool) {
-	latencyStruct, isPresent := A.Latencies[B.ID]
+	latencyStruct, isPresent := A.Latencies[string(B.ID.PublicKey)]
 	if !isPresent {
 		return 0, false
 	}

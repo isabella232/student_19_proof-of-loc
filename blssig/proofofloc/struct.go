@@ -15,7 +15,7 @@ type NodeID struct {
 	PublicKey sigAlg.PublicKey
 }
 
-type Latency struct {
+type ConfirmedLatency struct {
 	Latency            time.Duration
 	Timestamp          time.Time
 	SignedConfirmation []byte
@@ -24,7 +24,7 @@ type Latency struct {
 // Block represents a block with unique identification and a list of latencies of the following form: sigB[tsB, sigA[latABA]]
 type Block struct {
 	ID        *NodeID
-	Latencies map[*NodeID]Latency
+	Latencies map[string]ConfirmedLatency
 }
 
 //Node represents a block in process of being constructed (latencies)

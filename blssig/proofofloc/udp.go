@@ -9,7 +9,6 @@ import (
 
 func InitListening(srcAddress string) <-chan PingMsg {
 	receive := make(chan PingMsg, 10)
-	send := make(chan PingMsg, 10)
 	go listen(receive, srcAddress)
 	return receive
 }
@@ -17,6 +16,9 @@ func InitListening(srcAddress string) <-chan PingMsg {
 func listen(receive chan PingMsg, srcAddress string) {
 	nodeAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
 	connection, err := net.ListenUDP("udp", nodeAddress)
+	if err != nil {
+		return
+	}
 	defer connection.Close()
 	var message PingMsg
 	for {
@@ -33,6 +35,9 @@ func SendMessage(message *PingMsg, srcAddress string, dstAddress string) {
 	destinationAddress, _ := net.ResolveUDPAddr("udp", dstAddress)
 	sourceAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
 	connection, err := net.DialUDP("udp", sourceAddress, destinationAddress)
+	if err != nil {
+		return
+	}
 	defer connection.Close()
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
