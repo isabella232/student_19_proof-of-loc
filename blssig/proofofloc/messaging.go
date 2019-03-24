@@ -565,7 +565,7 @@ func (Node *Node) checkMessage5(msg *PingMsg) (*ConfirmedLatency, bool) {
 
 	newLatency := &ConfirmedLatency{
 		Latency:            latencyConstr.Latency,
-		Timestamp:          time.Now(),
+		Timestamp:          content.Timestamp,
 		SignedConfirmation: content.DoubleSignedForeignLatency,
 	}
 
@@ -579,41 +579,4 @@ func isFresh(timestamp time.Time, delta time.Duration) bool {
 
 func acceptableDifference(time1 time.Duration, time2 time.Duration, delta time.Duration) bool {
 	return time1-time2 < delta && time2-time1 < delta
-}
-
-func (Node *Node) handleIncomingMessages() {
-
-	for true {
-		newMsg := <-Node.ReceptionChannel
-		msgSeqNb := newMsg.SeqNb
-
-		switch msgSeqNb {
-		case 1:
-			msgContent, messageOkay := Node.checkMessage1(&newMsg)
-			if messageOkay {
-				Node.sendMessage2(&newMsg, msgContent)
-			}
-		case 2:
-			msgContent, messageOkay := Node.checkMessage2(&newMsg)
-			if messageOkay {
-				Node.sendMessage3(&newMsg, msgContent)
-			}
-		case 3:
-			msgContent, messageOkay := Node.checkMessage3(&newMsg)
-			if messageOkay {
-				Node.sendMessage4(&newMsg, msgContent)
-			}
-		case 4:
-			msgContent, messageOkay := Node.checkMessage4(&newMsg)
-			if messageOkay {
-				Node.sendMessage5(&newMsg, msgContent)
-			}
-		case 5:
-			doubleSignedLatency, messageOkay := Node.checkMessage5(&newMsg)
-			if messageOkay {
-				Node.BlockSkeleton.Latencies[string(newMsg.PublicKey)] = *doubleSignedLatency
-			}
-		}
-
-	}
 }

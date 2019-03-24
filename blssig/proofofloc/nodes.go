@@ -34,25 +34,31 @@ func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.Sui
 		PrivateKey:              privKey,
 		LatenciesInConstruction: make(map[string]*LatencyConstructor),
 		BlockSkeleton:           newBlock,
+		NbLatenciesRefreshed:    0,
 		ReceptionChannel:        receiverChannel,
 	}
 
-	//get ping times from nodes USE UDP ADD NONCE IN DATA -> 16byte + signed message in reply
+	// send pings
+	nbLatenciesNeeded := min(nbLatencies, len(roster.List))
+
+	//this message loops forever handling incoming messages
+	//its job is to put together latencies based on incoming messages and adding them to the block construction
+	//When enough new latencies are collected, a new block is generated and sent in to be signed, and the process starts anew
+	go handleIncomingMessages(newNode, nbLatenciesNeeded, chain)
+
+	return newNode, nil
+
+}
+
+func (Node *Node) RefreshBlock(roster *onet.Roster, chain *Chain) {
 
 	// send pings
 	nbLatenciesNeeded := min(nbLatencies, len(roster.List))
 
 	//for now just ping the first ones
 	for i := 0; i < nbLatenciesNeeded; i++ {
-		newNode.sendMessage1(chain.Blocks[i].ID)
+		Node.sendMessage1(chain.Blocks[i].ID)
 	}
-	//wait till all reply
-	for len(newBlock.Latencies) < nbLatenciesNeeded {
-		time.Sleep(1 * time.Millisecond)
-	}
-
-	return newNode, nil
-
 }
 
 func min(a, b int) int {
@@ -186,4 +192,76 @@ func (A *Block) ApproximateDistance(B *Block, C *Block, delta time.Duration) (ti
 //Since the angle between the three points is between 0 and 180 degrees, the function assumes an average angle of 90 degreess
 func Pythagoras(p1 time.Duration, p2 time.Duration) time.Duration {
 	return ((p1 ^ 2) + (p2 ^ 2)) ^ (1 / 2)
+}
+
+func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, chain *Chain) {
+
+	for true {
+		newMsg := <-Node.ReceptionChannel
+		msgSeqNb := newMsg.SeqNb
+
+		switch msgSeqNb {
+		case 1:
+			msgContent, messageOkay := Node.checkMessage1(&newMsg)
+			if messageOkay {
+				Node.sendMessage2(&newMsg, msgContent)
+			}
+		case 2:
+			msgContent, messageOkay := Node.checkMessage2(&newMsg)
+			if messageOkay {
+				Node.sendMessage3(&newMsg, msgContent)
+			}
+		case 3:
+			msgContent, messageOkay := Node.checkMessage3(&newMsg)
+			if messageOkay {
+				Node.sendMessage4(&newMsg, msgContent)
+			}
+		case 4:
+			msgContent, messageOkay := Node.checkMessage4(&newMsg)
+			if messageOkay {
+				Node.sendMessage5(&newMsg, msgContent)
+			}
+		case 5:
+			doubleSignedLatency, messageOkay := Node.checkMessage5(&newMsg)
+			if messageOkay {
+				Node.BlockSkeleton.Latencies[string(newMsg.PublicKey)] = *doubleSignedLatency
+
+				//get rid of contructor
+				Node.LatenciesInConstruction[string(newMsg.PublicKey)] = nil
+				Node.NbLatenciesRefreshed++
+
+				if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock {
+
+					block := Node.BlockSkeleton
+					//do some work
+					work(block)
+
+					h := sha256.New()
+					h.Write(request.Block)
+
+					//key is the hash of the block
+					key := h.Sum([]byte{})
+
+					//Add block to chain
+					db, bucket := s.GetAdditionalBucket([]byte(s.Chain.BucketName))
+
+					db.Update(func(tx *bbolt.Tx) error {
+						tx.Bucket(bucket).Put(key, request.Block)
+						return nil
+					})
+
+					//chain.Roster.Concat(block.id)
+					s.Chain.Blocks = append(s.Chain.Blocks, &block)
+
+					return &StoreBlockResponse{true}, nil
+
+				}
+			}
+		}
+
+	}
+}
+
+func work(block *proofofloc.Block) {
+
 }

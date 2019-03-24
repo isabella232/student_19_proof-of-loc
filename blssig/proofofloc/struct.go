@@ -33,6 +33,7 @@ type Node struct {
 	PrivateKey              sigAlg.PrivateKey
 	LatenciesInConstruction map[string]*LatencyConstructor
 	BlockSkeleton           *Block
+	NbLatenciesRefreshed    int
 	ReceptionChannel        <-chan PingMsg
 }
 
