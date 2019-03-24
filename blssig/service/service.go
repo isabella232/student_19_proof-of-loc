@@ -4,7 +4,7 @@ package service
 import (
 	"crypto/sha256"
 	"errors"
-	"github.com/dedis/student_19_proof-of-loc/blssig/proofofloc"
+	"github.com/dedis/student_19_proof-of-loc/blssig/latencyprotocol"
 	"github.com/dedis/student_19_proof-of-loc/blssig/protocol"
 	uuid "github.com/satori/go.uuid"
 	"go.dedis.ch/cothority/v3/messaging"
@@ -33,15 +33,15 @@ type BLSCoSiService struct {
 	*onet.ServiceProcessor
 	propagationFunction messaging.PropagationFunc
 	propagatedSignature []byte
-	Chain               *proofofloc.Chain
+	Chain               *latencyprotocol.Chain
 	Suite               *pairing.SuiteBn256
-	Nodes               []*proofofloc.Node
+	Nodes               []*latencyprotocol.Node
 }
 
 func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
 	s := &BLSCoSiService{
 		ServiceProcessor: onet.NewServiceProcessor(c),
-		Chain:            &proofofloc.Chain{Blocks: make([]*proofofloc.Block, 0), BucketName: []byte("proofoflocBlocks")},
+		Chain:            &latencyprotocol.Chain{Blocks: make([]*latencyprotocol.Block, 0), BucketName: []byte("latencyprotocolBlocks")},
 		Suite:            pairing.NewSuiteBn256(),
 	}
 
@@ -131,7 +131,7 @@ func (s *BLSCoSiService) CreateNode(request *CreateNodeRequest) (*CreateNodeResp
 	roster := request.Roster
 	id := request.ID
 
-	newNode, err := proofofloc.NewNode(id, roster, s.Suite, s.Chain)
+	newNode, err := latencyprotocol.NewNode(id, roster, s.Suite, s.Chain)
 
 	s.Nodes = append(s.Nodes, newNode)
 
@@ -148,7 +148,7 @@ func (s *BLSCoSiService) CreateNode(request *CreateNodeRequest) (*CreateNodeResp
 //StoreBlock adds a block to a chain
 func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResponse, error) {
 
-	block := proofofloc.Block{}
+	block := latencyprotocol.Block{}
 	err := protobuf.Decode(request.Block, &block)
 	if err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResp
 	return &StoreBlockResponse{true}, nil
 }
 
-func work(block *proofofloc.Block) {
+func work(block *latencyprotocol.Block) {
 
 }
 

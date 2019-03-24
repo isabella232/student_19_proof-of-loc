@@ -1,4 +1,4 @@
-package protocol
+package blscosiprotocol
 
 import (
 	"go.dedis.ch/onet/v3"

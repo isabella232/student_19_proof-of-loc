@@ -2,7 +2,7 @@ package service
 
 import (
 	"errors"
-	"github.com/dedis/student_19_proof-of-loc/blssig/proofofloc"
+	"github.com/dedis/student_19_proof-of-loc/blssig/latencyprotocol"
 	"go.dedis.ch/cothority/v3"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
@@ -51,7 +51,7 @@ signed by a majority, and then distributes it to other nodes. For now, nodes can
 but later we might add a “work” function, either computing a hash preimage like in Bitcoin or smth else.
 
 */
-func (c *Client) ProposeNewNode(id *network.ServerIdentity, roster *onet.Roster) (*proofofloc.Node, error) {
+func (c *Client) ProposeNewNode(id *network.ServerIdentity, roster *onet.Roster) (*latencyprotocol.Node, error) {
 
 	if len(roster.List) == 0 {
 		return nil, errors.New("Got an empty roster-list")
@@ -71,7 +71,7 @@ func (c *Client) ProposeNewNode(id *network.ServerIdentity, roster *onet.Roster)
 		return nil, err
 	}
 
-	newNode := proofofloc.Node{}
+	newNode := latencyprotocol.Node{}
 	err = protobuf.Decode(createNodeReply.Node, &newNode)
 	if err != nil {
 		return nil, err
