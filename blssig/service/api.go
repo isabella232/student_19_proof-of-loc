@@ -80,33 +80,36 @@ func (c *Client) ProposeNewNode(id *network.ServerIdentity, roster *onet.Roster)
 	return &newNode, nil
 }
 
-/*func (c *Client) triggerBlockCreationOnNode(Node *Node) {
+func (c *Client) triggerBlockCreationOnNode(Node *latencyprotocol.Node, roster *onet.Roster) (*latencyprotocol.Block, error) {
 
+	if len(roster.List) == 0 {
+		return nil, errors.New("Got an empty roster-list")
+	}
 
-	newBlockBytes := createNodeReply.Block
+	dst := roster.List[0]
 
-	sigReply, err := c.SignatureRequest(roster, newBlockBytes)
+	nodeBytes, err := protobuf.Encode(Node)
+	if err != nil {
+		return nil, err
+	}
+	newBlockRequest := &CreateBlockRequest{
+		Roster: roster,
+		Node:   nodeBytes,
+	}
+
+	log.Lvl1("Sending node creation request message to", dst)
+	createBlockReply := &CreateBlockResponse{}
+	err = c.SendProtobuf(dst, newBlockRequest, createBlockReply)
 	if err != nil {
 		return nil, err
 	}
 
-	storageRequest := &StoreBlockRequest{
-		Roster: roster,
-		Block:  sigReply.Signature,
-	}
-
-	log.Lvl1("Sending storage request message to", dst)
-	reply := &StoreBlockResponse{}
-	err = c.SendProtobuf(dst, storageRequest, reply)
+	newBlock := &latencyprotocol.Block{}
+	err = protobuf.Decode(createBlockReply.Block, newBlock)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	success := reply.BlockAdded
+	return newBlock, nil
 
-	if !success {
-		return errors.New("Block not successfully added")
-	}
-
-	return nil
-}*/
+}

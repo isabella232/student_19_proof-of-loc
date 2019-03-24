@@ -41,5 +41,5 @@ type CreateBlockRequest struct {
 
 //CreateBlockResponse is what a BLSCosi service replies to clients trying to store blocks
 type CreateBlockResponse struct {
-	BlockAdded bool
+	Block []byte
 }

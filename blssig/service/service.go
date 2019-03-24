@@ -85,44 +85,54 @@ func init() {
 
 // SignatureRequest treats external requests to this service.
 func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (*SignatureResponse, error) {
-	if req.Roster.ID.IsNil() {
-		req.Roster.ID = onet.RosterID(uuid.NewV4())
+	sig, prop, err := s.sign(req.Roster, req.Message)
+	if err != nil {
+		return nil, err
+	}
+	return &SignatureResponse{sig, prop}, nil
+
+}
+
+func (s *BLSCoSiService) sign(Roster *onet.Roster, Message []byte) ([]byte, []byte, error) {
+
+	if Roster.ID.IsNil() {
+		Roster.ID = onet.RosterID(uuid.NewV4())
 	}
 
-	_, root := req.Roster.Search(s.ServerIdentity().ID)
+	_, root := Roster.Search(s.ServerIdentity().ID)
 	if root == nil {
-		return nil, errors.New("Couldn't find a serverIdentity in Roster")
+		return nil, nil, errors.New("Couldn't find a serverIdentity in Roster")
 	}
 
-	tree := req.Roster.GenerateNaryTreeWithRoot(2, root)
+	tree := Roster.GenerateNaryTreeWithRoot(2, root)
 	pi, err := s.CreateProtocol(blscosiSigProtocolName, tree)
 	if err != nil {
-		return nil, errors.New("Couldn't make new protocol: " + err.Error())
+		return nil, nil, errors.New("Couldn't make new protocol: " + err.Error())
 	}
 
 	//Set message and start signing
 	protocolInstance := pi.(*blscosiprotocol.SimpleBLSCoSi)
-	protocolInstance.Message = req.Message
+	protocolInstance.Message = Message
 
 	log.Lvl3("BLSCosi Service starting up root protocol")
 
 	if err = pi.Start(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	//Get signature
 	sig := <-protocolInstance.FinalSignature
 
 	// We propagate the signature to all nodes
-	err = s.startPropagation(s.propagationFunction, req.Roster, &PropagationFunction{sig})
+	err = s.startPropagation(s.propagationFunction, Roster, &PropagationFunction{sig})
 	if err != nil {
 		log.Error(err, "Couldn't propagate signature:")
-		return nil, err
+		return nil, nil, err
 	}
 
 	prop := s.propagatedSignature
 
-	return &SignatureResponse{sig, prop}, nil
+	return sig, prop, nil
 
 }
 
@@ -166,8 +176,13 @@ func (s *BLSCoSiService) CreateBlock(request *CreateBlockRequest) (*CreateBlockR
 		return nil, err
 	}
 
+	sig, _, err := s.sign(request.Roster, blockBytes)
+	if err != nil {
+		return nil, err
+	}
+
 	h := sha256.New()
-	h.Write(blockBytes)
+	h.Write(sig)
 
 	//key is the hash of the block
 	key := h.Sum([]byte{})
@@ -176,14 +191,14 @@ func (s *BLSCoSiService) CreateBlock(request *CreateBlockRequest) (*CreateBlockR
 	db, bucket := s.GetAdditionalBucket([]byte(s.Chain.BucketName))
 
 	db.Update(func(tx *bbolt.Tx) error {
-		tx.Bucket(bucket).Put(key, blockBytes)
+		tx.Bucket(bucket).Put(key, sig)
 		return nil
 	})
 
 	//chain.Roster.Concat(block.id)
 	s.Chain.Blocks = append(s.Chain.Blocks, &newBlock)
 
-	return &CreateBlockResponse{true}, nil
+	return &CreateBlockResponse{blockBytes}, nil
 }
 
 func work(node *latencyprotocol.Node) {
