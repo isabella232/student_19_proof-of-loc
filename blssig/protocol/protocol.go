@@ -47,10 +47,10 @@ func NewLatencyVerificatingProtocol(n *onet.TreeNodeInstance) (onet.ProtocolInst
 
 		//check latencies -> 20 < x < 300 ms
 		for _, latency := range block.Latencies {
-			if latency < 20*time.Millisecond {
+			if latency.Latency < 20*time.Millisecond {
 				return errors.New("Latency too short")
 			}
-			if latency > 300*time.Millisecond {
+			if latency.Latency > 300*time.Millisecond {
 				return errors.New("Latency too long")
 			}
 		}

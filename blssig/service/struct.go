@@ -22,15 +22,15 @@ type PropagationFunction struct {
 	Signature []byte
 }
 
-//CreateBlockRequest is what the BLSCosi service is expected to receive from clients to create a new block
-type CreateBlockRequest struct {
+//CreateNodeRequest is what the BLSCosi service is expected to receive from clients to create a new block
+type CreateNodeRequest struct {
 	Roster *onet.Roster
 	ID     *network.ServerIdentity
 }
 
-//CreateBlockResponse is what a BLSCosi service replies to clients trying to create blocks
-type CreateBlockResponse struct {
-	Block []byte
+//CreateNodeResponse is what a BLSCosi service replies to clients trying to create blocks
+type CreateNodeResponse struct {
+	Node []byte
 }
 
 //StoreBlockRequest is what the BLSCosi service is expected to receive from clients to add Blocks to a chain

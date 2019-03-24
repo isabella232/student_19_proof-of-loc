@@ -2,10 +2,12 @@ package service
 
 import (
 	"errors"
+	"github.com/dedis/student_19_proof-of-loc/blssig/proofofloc"
 	"go.dedis.ch/cothority/v3"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
+	"go.dedis.ch/protobuf"
 )
 
 const nbPingsNeeded = 5
@@ -42,38 +44,50 @@ func (c *Client) SignatureRequest(r *onet.Roster, msg []byte) (*SignatureRespons
 
 /*
 
-ProposeNewBlock creates a new validator with given address and public key
+ProposeNewNode creates a new validator with given address and public key
 
 Every time a new node joins the identity chain, i.e., creates a block, it uses the BLSCoSiService to have the block
 signed by a majority, and then distributes it to other nodes. For now, nodes can join without doing any “work”,
 but later we might add a “work” function, either computing a hash preimage like in Bitcoin or smth else.
 
 */
-func (c *Client) ProposeNewBlock(id *network.ServerIdentity, roster *onet.Roster) error {
+func (c *Client) ProposeNewNode(id *network.ServerIdentity, roster *onet.Roster) (*proofofloc.Node, error) {
 
 	if len(roster.List) == 0 {
-		return errors.New("Got an empty roster-list")
+		return nil, errors.New("Got an empty roster-list")
 	}
 
 	dst := roster.List[0]
 
-	newBlockRequest := &CreateBlockRequest{
+	newNodeRequest := &CreateNodeRequest{
 		Roster: roster,
 		ID:     id,
 	}
 
-	log.Lvl1("Sending block creation request message to", dst)
-	createBlockReply := &CreateBlockResponse{}
-	err := c.SendProtobuf(dst, newBlockRequest, createBlockReply)
+	log.Lvl1("Sending node creation request message to", dst)
+	createNodeReply := &CreateNodeResponse{}
+	err := c.SendProtobuf(dst, newNodeRequest, createNodeReply)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	newBlockBytes := createBlockReply.Block
+	newNode := proofofloc.Node{}
+	err = protobuf.Decode(createNodeReply.Node, &newNode)
+	if err != nil {
+		return nil, err
+	}
+
+	return &newNode, nil
+}
+
+/*func (c *Client) triggerBlockCreationOnNode(Node *Node) {
+
+
+	newBlockBytes := createNodeReply.Block
 
 	sigReply, err := c.SignatureRequest(roster, newBlockBytes)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	storageRequest := &StoreBlockRequest{
@@ -95,4 +109,4 @@ func (c *Client) ProposeNewBlock(id *network.ServerIdentity, roster *onet.Roster
 	}
 
 	return nil
-}
+}*/

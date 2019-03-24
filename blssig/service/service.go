@@ -24,20 +24,9 @@ import (
 // ServiceName is the name to refer to BLSCoSiService
 const ServiceName = "BLSCoSiService"
 
-const protoName = "blscosiproto"
+const blscosiSigProtocolName = "blscosiproto"
 
 var serviceID onet.ServiceID
-
-func init() {
-	var err error
-	serviceID, err = onet.RegisterNewService(ServiceName, newBLSCoSiService)
-	log.ErrFatal(err)
-	onet.GlobalProtocolRegister(protoName, protocol.NewDefaultProtocol)
-	network.RegisterMessages(&SignatureRequest{}, &SignatureResponse{})
-	network.RegisterMessage(&PropagationFunction{})
-	network.RegisterMessages(&StoreBlockRequest{}, &StoreBlockResponse{})
-	network.RegisterMessages(&CreateBlockRequest{}, &CreateBlockResponse{})
-}
 
 // BLSCoSiService is the service that handles collective signing operations
 type BLSCoSiService struct {
@@ -46,6 +35,52 @@ type BLSCoSiService struct {
 	propagatedSignature []byte
 	Chain               *proofofloc.Chain
 	Suite               *pairing.SuiteBn256
+	Nodes               []*proofofloc.Node
+}
+
+func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
+	s := &BLSCoSiService{
+		ServiceProcessor: onet.NewServiceProcessor(c),
+		Chain:            &proofofloc.Chain{Blocks: make([]*proofofloc.Block, 0), BucketName: []byte("proofoflocBlocks")},
+		Suite:            pairing.NewSuiteBn256(),
+	}
+
+	err := s.RegisterHandler(s.SignatureRequest)
+	if err != nil {
+		log.Error(err, "Couldn't register handler:")
+		return nil, err
+	}
+
+	err = s.RegisterHandler(s.StoreBlock)
+	if err != nil {
+		log.Error(err, "Couldn't register handler:")
+		return nil, err
+	}
+
+	err = s.RegisterHandler(s.CreateNode)
+	if err != nil {
+		log.Error(err, "Couldn't register handler:")
+		return nil, err
+	}
+
+	s.propagationFunction, err = messaging.NewPropagationFunc(c, "propagateBLSCoSiSignature", s.propagateFuncHandler, -1)
+	if err != nil {
+		log.Error(err, "Couldn't create propagation function:")
+		return nil, err
+	}
+
+	return s, nil
+}
+
+func init() {
+	var err error
+	serviceID, err = onet.RegisterNewService(ServiceName, newBLSCoSiService)
+	log.ErrFatal(err)
+	onet.GlobalProtocolRegister(blscosiSigProtocolName, protocol.NewDefaultProtocol)
+	network.RegisterMessages(&SignatureRequest{}, &SignatureResponse{})
+	network.RegisterMessage(&PropagationFunction{})
+	network.RegisterMessages(&StoreBlockRequest{}, &StoreBlockResponse{})
+	network.RegisterMessages(&CreateNodeRequest{}, &CreateNodeResponse{})
 }
 
 // SignatureRequest treats external requests to this service.
@@ -60,7 +95,7 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (*SignatureResp
 	}
 
 	tree := req.Roster.GenerateNaryTreeWithRoot(2, root)
-	pi, err := s.CreateProtocol(protoName, tree)
+	pi, err := s.CreateProtocol(blscosiSigProtocolName, tree)
 	if err != nil {
 		return nil, errors.New("Couldn't make new protocol: " + err.Error())
 	}
@@ -91,19 +126,22 @@ func (s *BLSCoSiService) SignatureRequest(req *SignatureRequest) (*SignatureResp
 
 }
 
-//CreateBlock creates a new Block
-func (s *BLSCoSiService) CreateBlock(request *CreateBlockRequest) (*CreateBlockResponse, error) {
+//CreateNode creates a new Block
+func (s *BLSCoSiService) CreateNode(request *CreateNodeRequest) (*CreateNodeResponse, error) {
 	roster := request.Roster
 	id := request.ID
 
-	newBlock, err := proofofloc.NewBlock(id, roster, s.Suite, s.Chain)
+	newNode, err := proofofloc.NewNode(id, roster, s.Suite, s.Chain)
 
-	blockBytes, err := protobuf.Encode(newBlock)
+	s.Nodes = append(s.Nodes, newNode)
+
+	nodeBytes, err := protobuf.Encode(newNode)
+
 	if err != nil {
 		return nil, err
 	}
 
-	return &CreateBlockResponse{blockBytes}, nil
+	return &CreateNodeResponse{nodeBytes}, nil
 
 }
 
@@ -140,40 +178,6 @@ func (s *BLSCoSiService) StoreBlock(request *StoreBlockRequest) (*StoreBlockResp
 
 func work(block *proofofloc.Block) {
 
-}
-
-func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
-	s := &BLSCoSiService{
-		ServiceProcessor: onet.NewServiceProcessor(c),
-		Chain:            &proofofloc.Chain{Blocks: make([]*proofofloc.Block, 0), BucketName: []byte("proofoflocBlocks")},
-		Suite:            pairing.NewSuiteBn256(),
-	}
-
-	err := s.RegisterHandler(s.SignatureRequest)
-	if err != nil {
-		log.Error(err, "Couldn't register handler:")
-		return nil, err
-	}
-
-	err = s.RegisterHandler(s.StoreBlock)
-	if err != nil {
-		log.Error(err, "Couldn't register handler:")
-		return nil, err
-	}
-
-	err = s.RegisterHandler(s.CreateBlock)
-	if err != nil {
-		log.Error(err, "Couldn't register handler:")
-		return nil, err
-	}
-
-	s.propagationFunction, err = messaging.NewPropagationFunc(c, "propagateBLSCoSiSignature", s.propagateFuncHandler, -1)
-	if err != nil {
-		log.Error(err, "Couldn't create propagation function:")
-		return nil, err
-	}
-
-	return s, nil
 }
 
 //startPropagation propagates the final signature to all the other nodes

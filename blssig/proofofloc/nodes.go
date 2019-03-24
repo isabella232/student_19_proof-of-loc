@@ -232,36 +232,9 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, chain *Chain
 
 				if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock {
 
-					block := Node.BlockSkeleton
-					//do some work
-					work(block)
-
-					h := sha256.New()
-					h.Write(request.Block)
-
-					//key is the hash of the block
-					key := h.Sum([]byte{})
-
-					//Add block to chain
-					db, bucket := s.GetAdditionalBucket([]byte(s.Chain.BucketName))
-
-					db.Update(func(tx *bbolt.Tx) error {
-						tx.Bucket(bucket).Put(key, request.Block)
-						return nil
-					})
-
-					//chain.Roster.Concat(block.id)
-					s.Chain.Blocks = append(s.Chain.Blocks, &block)
-
-					return &StoreBlockResponse{true}, nil
-
 				}
 			}
 		}
 
 	}
-}
-
-func work(block *proofofloc.Block) {
-
 }
