@@ -4,11 +4,8 @@ import (
 	"errors"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
-	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
-	"go.dedis.ch/protobuf"
 	sigAlg "golang.org/x/crypto/ed25519"
-	"math/rand"
 	"strconv"
 	"time"
 )
@@ -27,36 +24,30 @@ func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.Sui
 	//create new block
 	newBlock := &Block{ID: nodeID, Latencies: latencies}
 
+	receiverChannel := InitListening(id.Address.NetworkAddress())
+
 	newNode := &Node{
 		ID:                      nodeID,
 		PrivateKey:              privKey,
-		LatenciesInConstruction: make([]LatencyConstructor, 0),
+		LatenciesInConstruction: make(map[string]*LatencyConstructor),
 		BlockSkeleton:           newBlock,
+		ReceptionChannel:        receiverChannel,
 	}
 
 	//get ping times from nodes USE UDP ADD NONCE IN DATA -> 16byte + signed message in reply
-
-	initConnection(id.Address, suite, newNode)
 
 	// send pings
 	nbLatenciesNeeded := min(nbLatencies, len(roster.List))
 
 	//for now just ping the first ones
 	for i := 0; i < nbLatenciesNeeded; i++ {
-		newNode.LatenciesInConstruction[i] = LatencyConstructor{
-			StartedLocally: true,
-			DstID:          chain.Blocks[i].ID,
-			Messages:       make([]PingMsg, 3),
-			Nonces:         make([]byte, 2),
-			Timestamps:     make([]time.Time, 2),
-			ClockSkews:     make([]time.Duration, 2),
-			latency:        0,
-		}
+
 	}
 
 	nbReplies := 0
 	//wait till all reply
 	for len(newBlock.Latencies) < nbLatenciesNeeded {
+		newNode.constructLatencies()
 		time.Sleep(1 * time.Millisecond)
 	}
 
@@ -64,16 +55,9 @@ func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.Sui
 
 }
 
-func initConnection(address network.Address, suite *pairing.SuiteBn256, newNode *Node) {
-	//get ping times from nodes USE UDP ADD NONCE IN DATA -> 16byte + signed message in reply
+func (Node *Node) constructLatencies() {
 
-	listener, err := network.NewTCPListener(address, suite)
-	if err != nil {
-		log.Error(err, "Couldn't create listener:")
-		return
-	}
-
-	listener.Listen(newNode.pingListen)
+	receivedMessage := <-Node.ReceptionChannel
 
 }
 
@@ -208,81 +192,4 @@ func (A *Block) ApproximateDistance(B *Block, C *Block, delta time.Duration) (ti
 //Since the angle between the three points is between 0 and 180 degrees, the function assumes an average angle of 90 degreess
 func Pythagoras(p1 time.Duration, p2 time.Duration) time.Duration {
 	return ((p1 ^ 2) + (p2 ^ 2)) ^ (1 / 2)
-}
-
-/*Ping allows a validator node to ping another node
-
-The ping function is, for now, a random delay between 20 ms and 300 ms.
-
-When node a pings node b, node a sends a message “ping” to node b (using onet) and node b replies with “pong” within a random delay time
-*/
-func (Node *Node) ping(dest *Node, suite *pairing.SuiteBn256) {
-
-	conn, err := network.NewTCPConn(dest.ID.ServerID.Address, suite)
-
-	if err != nil {
-		log.Error(err, "Couldn't create new TCP connection:")
-		return
-	}
-
-	nonceVal := rand.Int()
-	nonceBytes, err := protobuf.Encode(nonceVal)
-	if err != nil {
-		return
-	}
-
-	//save nonce
-	Node.Nonces[dest.ID] = nonceBytes
-
-	_, err1 := conn.Send(PingMsg{ID: Node.BlockSkeleton.ID, Nonce: nonceBytes, IsReply: false, StartingTime: time.Now()})
-
-	if err1 != nil {
-		log.Error(err, "Couldn't send ping message:")
-		return
-	}
-
-	conn.Close()
-
-}
-
-//pingListen listens for pings and pongs from other validators and handles them accordingly
-func (Node *Node) pingListen(c network.Conn) {
-
-	env, err := c.Receive()
-
-	if err != nil {
-		log.Error(err, "Couldn't send receive message from connection:")
-		return
-	}
-
-	//Filter for the two types of messages we care about
-	Msg, isPing := env.Msg.(PingMsg)
-
-	// Case 1: someone pings us -> reply with pong and control values
-	if isPing {
-		if !Msg.IsReply {
-
-			//CHECK TIMESTAMP FOR AGE of message
-
-			signedNonce := sigAlg.Sign(Node.PrivateKey, Msg.Nonce)
-			//sign return message, check time
-			c.Send(PingMsg{ID: Node.BlockSkeleton.ID, Nonce: signedNonce, IsReply: true, StartingTime: Msg.StartingTime})
-		} else {
-			//Case 2: someone replies to our ping -> check return time
-			if Msg.IsReply {
-
-				nonceCorrect := sigAlg.Verify(Node.PublicKeys[Msg.ID], Msg.Nonce, Node.Nonces[Msg.ID])
-				if nonceCorrect {
-
-					latency := time.Since(Msg.StartingTime) //save start time locally
-					Node.BlockSkeleton.Latencies[Msg.ID] = latency
-					*Node.NbReplies++
-				}
-
-			}
-		}
-
-		c.Close()
-
-	}
 }

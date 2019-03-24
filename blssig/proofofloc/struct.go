@@ -7,7 +7,7 @@ import (
 )
 
 //Nonce represents a random value to make a message unique
-type Nonce []byte
+type Nonce int
 
 //NodeID represents an identifier for a node: its serverIdentity and Public Key
 type NodeID struct {
@@ -31,8 +31,9 @@ type Block struct {
 type Node struct {
 	ID                      *NodeID
 	PrivateKey              sigAlg.PrivateKey
-	LatenciesInConstruction []LatencyConstructor
+	LatenciesInConstruction map[string]*LatencyConstructor
 	BlockSkeleton           *Block
+	ReceptionChannel        <-chan PingMsg
 }
 
 //Chain represents a list of blocks that have joined the system
@@ -41,67 +42,13 @@ type Chain struct {
 	BucketName []byte
 }
 
-//PingMsg represents a message sent to another validator
-type PingMsg struct {
-	SrcIP string
-	DstIP string
-	SeqNb int
-
-	content []byte
-}
-
-type PingMsg1 struct {
-	PublicKey sigAlg.PublicKey
-	SrcNonce  Nonce
-	Timestamp time.Time
-	Signed    []byte
-}
-
-type PingMsg2 struct {
-	PublicKey sigAlg.PublicKey
-	SrcNonce  Nonce
-	DstNonce  Nonce
-	Timestamp time.Time
-	Signed    []byte
-}
-
-type PingMsg3 struct {
-	PublicKey     sigAlg.PublicKey
-	SrcNonce      Nonce
-	DstNonce      Nonce
-	Timestamp     time.Time
-	Latency       time.Duration
-	SignedLatency []byte
-	Signed        []byte
-}
-
-type PingMsg4 struct {
-	PublicKey           sigAlg.PublicKey
-	SrcNonce            Nonce
-	DstNonce            Nonce
-	Timestamp           time.Time
-	Latency             time.Duration
-	SignedLatency       []byte
-	DoubleSignedLatency []byte
-	Signed              []byte
-}
-
-type PingMsg5 struct {
-	PublicKey           sigAlg.PublicKey
-	DstNonce            Nonce
-	Timestamp           time.Time
-	DoubleSignedLatency []byte
-	Signed              []byte
-}
-
 //LatencyConstructor represents the values used during a latency calculation protocol
 type LatencyConstructor struct {
 	StartedLocally bool
 	CurrentMsgNb   int
 	DstID          *NodeID
-	Messages       []PingMsg
-	Nonces         []byte
+	Nonces         []Nonce
 	Timestamps     []time.Time
 	ClockSkews     []time.Duration
-	latency        time.Duration
+	Latency        time.Duration
 }
