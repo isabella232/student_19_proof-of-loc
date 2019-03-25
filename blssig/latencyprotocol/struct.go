@@ -46,11 +46,12 @@ type Chain struct {
 
 //LatencyConstructor represents the values used during a latency calculation protocol
 type LatencyConstructor struct {
-	StartedLocally bool
-	CurrentMsgNb   int
-	DstID          *NodeID
-	Nonces         []Nonce
-	Timestamps     []time.Time
-	ClockSkews     []time.Duration
-	Latency        time.Duration
+	StartedLocally    bool
+	CurrentMsgNb      int
+	DstID             *NodeID
+	Nonce             Nonce
+	LocalTimestamps   []time.Time
+	ForeignTimestamps []time.Time
+	ClockSkews        []time.Duration
+	Latency           time.Duration
 }

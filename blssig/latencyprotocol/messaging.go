@@ -37,13 +37,12 @@ type PingMsg2 struct {
 
 //PingMsg3 represents the content of the latency protocol's third message
 type PingMsg3 struct {
-	SrcNonce      Nonce
 	DstNonce      Nonce
-	Timestamp     time.Time
 	Latency       time.Duration
 	SignedLatency []byte
 }
 
+//SignedForeignLatency represents the latency a block signs for another block, using a timestamp to prevent the block from reusing our signature
 type SignedForeignLatency struct {
 	timestamp     time.Time
 	signedLatency []byte
@@ -51,9 +50,6 @@ type SignedForeignLatency struct {
 
 //PingMsg4 represents the content of the latency protocol's fourth message
 type PingMsg4 struct {
-	SrcNonce                   Nonce
-	DstNonce                   Nonce
-	Timestamp                  time.Time
 	LocalLatency               time.Duration
 	SignedLocalLatency         []byte
 	SignedForeignLatency       SignedForeignLatency
@@ -62,8 +58,6 @@ type PingMsg4 struct {
 
 //PingMsg5 represents the content of the latency protocol's fifth message
 type PingMsg5 struct {
-	DstNonce                   Nonce
-	Timestamp                  time.Time
 	SignedForeignLatency       SignedForeignLatency
 	DoubleSignedForeignLatency []byte
 }
@@ -85,17 +79,17 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) {
 	}
 
 	latConstr := LatencyConstructor{
-		StartedLocally: true,
-		CurrentMsgNb:   1,
-		DstID:          dstNodeID,
-		Nonces:         make([]Nonce, 2),
-		Timestamps:     make([]time.Time, 2),
-		ClockSkews:     make([]time.Duration, 2),
-		Latency:        0,
+		StartedLocally:    true,
+		CurrentMsgNb:      1,
+		DstID:             dstNodeID,
+		Nonce:             nonce,
+		LocalTimestamps:   make([]time.Time, 2),
+		ForeignTimestamps: make([]time.Time, 2),
+		ClockSkews:        make([]time.Duration, 2),
+		Latency:           0,
 	}
 
-	latConstr.Nonces[0] = nonce
-	latConstr.Timestamps[0] = timestamp
+	latConstr.LocalTimestamps[0] = timestamp
 
 	Node.LatenciesInConstruction[string(dstNodeID.PublicKey)] = &latConstr
 
@@ -155,21 +149,22 @@ func (Node *Node) checkMessage1(msg *PingMsg) (*PingMsg1, bool) {
 
 func (Node *Node) sendMessage2(msg *PingMsg, msgContent *PingMsg1) {
 
+	nonce := Nonce(rand.Int())
+
 	latencyConstr := &LatencyConstructor{
-		StartedLocally: false,
-		CurrentMsgNb:   2,
-		DstID:          &NodeID{&msg.Dst, msg.PublicKey},
-		Nonces:         make([]Nonce, 2),
-		Timestamps:     make([]time.Time, 2),
-		ClockSkews:     make([]time.Duration, 2),
-		Latency:        0,
+		StartedLocally:    false,
+		CurrentMsgNb:      2,
+		DstID:             &NodeID{&msg.Dst, msg.PublicKey},
+		Nonce:             nonce,
+		LocalTimestamps:   make([]time.Time, 2),
+		ForeignTimestamps: make([]time.Time, 2),
+		ClockSkews:        make([]time.Duration, 2),
+		Latency:           0,
 	}
 
-	nonce := Nonce(rand.Int())
-	latencyConstr.Nonces[0] = nonce
-
 	localtime := time.Now()
-	latencyConstr.Timestamps[0] = localtime
+	latencyConstr.LocalTimestamps[0] = localtime
+	latencyConstr.ForeignTimestamps[0] = msgContent.Timestamp
 	latencyConstr.ClockSkews[0] = localtime.Sub(msgContent.Timestamp)
 
 	msg2Content := &PingMsg2{
@@ -233,12 +228,12 @@ func (Node *Node) checkMessage2(msg *PingMsg) (*PingMsg2, bool) {
 	}
 
 	//Check message 2 sent after message 1
-	if content.Timestamp.Before(latencyConstr.Timestamps[0]) {
+	if content.Timestamp.Before(latencyConstr.LocalTimestamps[0]) {
 		return nil, false
 	}
 
 	//check nonce
-	if content.DstNonce != latencyConstr.Nonces[0] {
+	if content.DstNonce != latencyConstr.Nonce {
 		return nil, false
 	}
 
@@ -251,22 +246,18 @@ func (Node *Node) sendMessage3(msg *PingMsg, msgContent *PingMsg2) {
 	latencyConstr := Node.LatenciesInConstruction[string(msg.PublicKey)]
 	latencyConstr.CurrentMsgNb += 2
 
-	nonceToSend := Nonce(rand.Int())
-	latencyConstr.Nonces[1] = nonceToSend
-
 	localtime := time.Now()
-	latencyConstr.Timestamps[1] = localtime
+	latencyConstr.LocalTimestamps[1] = localtime
+	latencyConstr.ForeignTimestamps[0] = msgContent.Timestamp
 	latencyConstr.ClockSkews[0] = localtime.Sub(msgContent.Timestamp)
 
-	latency := localtime.Sub(latencyConstr.Timestamps[0])
+	latency := localtime.Sub(latencyConstr.LocalTimestamps[0])
 	latencyConstr.Latency = latency
 	unsignedLatency, err := protobuf.Encode(latency)
 	signedLatency := sigAlg.Sign(Node.PrivateKey, unsignedLatency)
 
 	msg3Content := &PingMsg3{
-		SrcNonce:      nonceToSend,
 		DstNonce:      msgContent.SrcNonce,
-		Timestamp:     localtime,
 		Latency:       latency,
 		SignedLatency: signedLatency,
 	}
@@ -280,11 +271,10 @@ func (Node *Node) sendMessage3(msg *PingMsg, msgContent *PingMsg2) {
 	signedContent := sigAlg.Sign(Node.PrivateKey, unsignedContent)
 
 	newMsg := &PingMsg{
-		Src:       msg.Dst,
-		Dst:       msg.Src,
-		SeqNb:     3,
-		PublicKey: Node.ID.PublicKey,
-
+		Src:             msg.Dst,
+		Dst:             msg.Src,
+		SeqNb:           3,
+		PublicKey:       Node.ID.PublicKey,
 		UnsignedContent: unsignedContent,
 		SignedContent:   signedContent,
 	}
@@ -320,18 +310,16 @@ func (Node *Node) checkMessage3(msg *PingMsg) (*PingMsg3, bool) {
 		return nil, false
 	}
 
-	//check freshness
-	if !isFresh(content.Timestamp, freshnessDelta) {
-		return nil, false
-	}
+	sigTimestamp := latencyConstr.ForeignTimestamps[0].Add(content.Latency)
+	latencyConstr.ForeignTimestamps[1] = sigTimestamp
 
-	//Check message 3 sent after message 2
-	if content.Timestamp.Before(latencyConstr.Timestamps[0]) {
+	//check freshness
+	if !isFresh(sigTimestamp, freshnessDelta) {
 		return nil, false
 	}
 
 	//check nonce
-	if content.DstNonce != latencyConstr.Nonces[0] {
+	if content.DstNonce != latencyConstr.Nonce {
 		return nil, false
 	}
 
@@ -344,19 +332,16 @@ func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
 	latencyConstr := Node.LatenciesInConstruction[string(msg.PublicKey)]
 	latencyConstr.CurrentMsgNb += 2
 
-	nonceToSend := Nonce(rand.Int())
-	latencyConstr.Nonces[1] = nonceToSend
-
 	localtime := time.Now()
-	latencyConstr.Timestamps[1] = localtime
-	latencyConstr.ClockSkews[1] = localtime.Sub(msgContent.Timestamp)
+	latencyConstr.LocalTimestamps[1] = localtime
+	latencyConstr.ClockSkews[1] = localtime.Sub(latencyConstr.ForeignTimestamps[1])
 
 	if !acceptableDifference(latencyConstr.ClockSkews[0], latencyConstr.ClockSkews[1], intervallDelta) {
 		//TODO
 		return
 	}
 
-	localLatency := localtime.Sub(latencyConstr.Timestamps[0])
+	localLatency := localtime.Sub(latencyConstr.LocalTimestamps[0])
 
 	latencyConstr.Latency = localLatency
 
@@ -380,9 +365,6 @@ func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
 	doubleSignedforeignLatency := sigAlg.Sign(Node.PrivateKey, signedForeignLatencyBytes)
 
 	msg4Content := &PingMsg4{
-		SrcNonce:                   nonceToSend,
-		DstNonce:                   msgContent.SrcNonce,
-		Timestamp:                  localtime,
 		LocalLatency:               localLatency,
 		SignedLocalLatency:         signedLocalLatency,
 		SignedForeignLatency:       signedForeignLatency,
@@ -438,18 +420,11 @@ func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
 		return nil, false
 	}
 
+	sentTimestamp := content.SignedForeignLatency.timestamp
+	latencyConstr.ForeignTimestamps[1] = sentTimestamp
+
 	//check freshness
-	if !isFresh(content.Timestamp, freshnessDelta) {
-		return nil, false
-	}
-
-	//Check message 4 sent after message 3
-	if content.Timestamp.Before(latencyConstr.Timestamps[1]) {
-		return nil, false
-	}
-
-	//check nonce
-	if content.DstNonce != latencyConstr.Nonces[1] {
+	if !isFresh(sentTimestamp, freshnessDelta) {
 		return nil, false
 	}
 
@@ -463,8 +438,8 @@ func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLat
 	latencyConstr.CurrentMsgNb += 2
 
 	localtime := time.Now()
-	latencyConstr.Timestamps[1] = localtime
-	latencyConstr.ClockSkews[1] = localtime.Sub(msgContent.Timestamp)
+	latencyConstr.LocalTimestamps[1] = localtime
+	latencyConstr.ClockSkews[1] = localtime.Sub(latencyConstr.ForeignTimestamps[1])
 
 	if !acceptableDifference(latencyConstr.ClockSkews[0], latencyConstr.ClockSkews[1], intervallDelta) {
 		//TODO
@@ -485,8 +460,6 @@ func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLat
 	doubleSignedforeignLatency := sigAlg.Sign(Node.PrivateKey, signedForeignLatencyBytes)
 
 	msg5Content := &PingMsg5{
-		DstNonce:                   msgContent.SrcNonce,
-		Timestamp:                  localtime,
 		SignedForeignLatency:       signedForeignLatency,
 		DoubleSignedForeignLatency: doubleSignedforeignLatency,
 	}
@@ -516,7 +489,7 @@ func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLat
 
 	newLatency := &ConfirmedLatency{
 		Latency:            latencyConstr.Latency,
-		Timestamp:          msgContent.Timestamp,
+		Timestamp:          latencyConstr.ForeignTimestamps[1],
 		SignedConfirmation: msgContent.DoubleSignedForeignLatency,
 	}
 
@@ -548,24 +521,21 @@ func (Node *Node) checkMessage5(msg *PingMsg) (*ConfirmedLatency, bool) {
 		return nil, false
 	}
 
+	sentTimestamp := content.SignedForeignLatency.timestamp
+
 	//check freshness
-	if !isFresh(content.Timestamp, freshnessDelta) {
+	if !isFresh(sentTimestamp, freshnessDelta) {
 		return nil, false
 	}
 
 	//Check message 5 sent after message 4
-	if content.Timestamp.Before(latencyConstr.Timestamps[1]) {
-		return nil, false
-	}
-
-	//check nonce
-	if content.DstNonce != latencyConstr.Nonces[1] {
+	if sentTimestamp.Before(latencyConstr.LocalTimestamps[1]) {
 		return nil, false
 	}
 
 	newLatency := &ConfirmedLatency{
 		Latency:            latencyConstr.Latency,
-		Timestamp:          content.Timestamp,
+		Timestamp:          sentTimestamp,
 		SignedConfirmation: content.DoubleSignedForeignLatency,
 	}
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
+	//"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"strconv"
@@ -32,8 +33,9 @@ func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.Sui
 	BlockChannel := make(chan Block, 1)
 
 	newNode := &Node{
-		ID:                      nodeID,
-		PrivateKey:              privKey,
+		ID:         nodeID,
+		PrivateKey: privKey,
+		//note: this takes a publicKey converted to a string as key
 		LatenciesInConstruction: make(map[string]*LatencyConstructor),
 		BlockSkeleton:           newBlock,
 		NbLatenciesRefreshed:    0,
@@ -72,7 +74,8 @@ func min(a, b int) int {
 }
 
 func (A *Block) getLatency(B *Block) (time.Duration, bool) {
-	latencyStruct, isPresent := A.Latencies[string(B.ID.PublicKey)]
+	key := string(B.ID.PublicKey)
+	latencyStruct, isPresent := A.Latencies[key]
 	if !isPresent {
 		return 0, false
 	}
