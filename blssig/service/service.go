@@ -138,10 +138,9 @@ func (s *BLSCoSiService) sign(Roster *onet.Roster, Message []byte) ([]byte, []by
 
 //CreateNode creates a new Block
 func (s *BLSCoSiService) CreateNode(request *CreateNodeRequest) (*CreateNodeResponse, error) {
-	roster := request.Roster
 	id := request.ID
 
-	newNode, err := latencyprotocol.NewNode(id, roster, s.Suite, s.Chain)
+	newNode, err := latencyprotocol.NewNode(id, s.Suite, s.Chain)
 
 	s.Nodes = append(s.Nodes, newNode)
 
@@ -164,7 +163,7 @@ func (s *BLSCoSiService) CreateBlock(request *CreateBlockRequest) (*CreateBlockR
 		return nil, err
 	}
 
-	node.RefreshBlock(request.Roster, s.Chain)
+	node.AddBlock(s.Chain)
 
 	newBlock := <-node.BlockChannel
 

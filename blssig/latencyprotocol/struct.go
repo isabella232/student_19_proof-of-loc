@@ -15,6 +15,7 @@ type NodeID struct {
 	PublicKey sigAlg.PublicKey
 }
 
+//ConfirmedLatency is a struct that is stored in the block to represent latencies
 type ConfirmedLatency struct {
 	Latency            time.Duration
 	Timestamp          time.Time

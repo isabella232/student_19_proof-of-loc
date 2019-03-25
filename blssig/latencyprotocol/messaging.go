@@ -101,7 +101,7 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) {
 
 	signed := sigAlg.Sign(Node.PrivateKey, unsigned)
 
-	msg := &PingMsg{
+	msg := PingMsg{
 		Src:       *Node.ID.ServerID,
 		Dst:       *dstNodeID.ServerID,
 		SeqNb:     1,
@@ -181,7 +181,7 @@ func (Node *Node) sendMessage2(msg *PingMsg, msgContent *PingMsg1) {
 
 	signed := sigAlg.Sign(Node.PrivateKey, unsigned)
 
-	newMsg := &PingMsg{
+	newMsg := PingMsg{
 		Src:       msg.Dst,
 		Dst:       msg.Src,
 		SeqNb:     2,
@@ -270,7 +270,7 @@ func (Node *Node) sendMessage3(msg *PingMsg, msgContent *PingMsg2) {
 
 	signedContent := sigAlg.Sign(Node.PrivateKey, unsignedContent)
 
-	newMsg := &PingMsg{
+	newMsg := PingMsg{
 		Src:             msg.Dst,
 		Dst:             msg.Src,
 		SeqNb:           3,
@@ -379,7 +379,7 @@ func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
 
 	signedContent := sigAlg.Sign(Node.PrivateKey, unsignedContent)
 
-	newMsg := &PingMsg{
+	newMsg := PingMsg{
 		Src:       msg.Dst,
 		Dst:       msg.Src,
 		SeqNb:     4,
@@ -472,7 +472,7 @@ func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLat
 
 	signedContent := sigAlg.Sign(Node.PrivateKey, unsignedContent)
 
-	newMsg := &PingMsg{
+	newMsg := PingMsg{
 		Src:       msg.Dst,
 		Dst:       msg.Src,
 		SeqNb:     5,

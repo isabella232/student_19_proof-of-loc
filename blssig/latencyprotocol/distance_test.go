@@ -20,11 +20,7 @@ const (
 	variant
 )
 
-var tSuite = pairing.NewSuiteBn256()
-
-func TestMain(m *testing.M) {
-	log.MainTest(m)
-}
+var distanceSuite = pairing.NewSuiteBn256()
 
 /*Test ApproximateDistance initially by assuming
 all nodes are honest, each node adds in the blockchain x distances from itself to other x nodes,
@@ -32,7 +28,7 @@ where these x nodes are randomly chosen. You can assume for now that there’s a
 of randomness that nodes use. Check the results by varying the number x and the total number of nodes N.*/
 
 func initChain(N int, x int, src sourceType) *Chain {
-	local := onet.NewTCPTest(tSuite)
+	local := onet.NewTCPTest(distanceSuite)
 	// generate 3 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
 	_, el, _ := local.GenTree(N, false)

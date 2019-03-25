@@ -2,50 +2,65 @@ package latencyprotocol
 
 // sources: https://holwech.github.io/blog/Creating-a-simple-UDP-module/
 import (
-	"bytes"
-	"encoding/gob"
+	"go.dedis.ch/onet/v3/log"
+	"go.dedis.ch/protobuf"
 	"net"
 )
 
-func InitListening(srcAddress string) <-chan PingMsg {
+//InitListening allows the start of listening for pings on the server
+func InitListening(srcAddress string, finish <-chan bool) <-chan PingMsg {
+	log.LLvl1("Init UDP listening on " + srcAddress)
 	receive := make(chan PingMsg, 10)
-	go listen(receive, srcAddress)
+	go listen(receive, srcAddress, finish)
 	return receive
 }
 
-func listen(receive chan PingMsg, srcAddress string) {
+func listen(receive chan PingMsg, srcAddress string, finish <-chan bool) {
+
+	log.LLvl1("Setting up address")
 	nodeAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
+
+	log.LLvl1("Open connection")
 	connection, err := net.ListenUDP("udp", nodeAddress)
 	if err != nil {
 		return
 	}
 	defer connection.Close()
-	var message PingMsg
+
+	log.LLvl1("Wait for message")
+	var msg PingMsg
 	for {
-		inputBytes := make([]byte, 4096)
-		length, _, _ := connection.ReadFromUDP(inputBytes)
-		buffer := bytes.NewBuffer(inputBytes[:length])
-		decoder := gob.NewDecoder(buffer)
-		decoder.Decode(&message)
-		receive <- message
+		select {
+		case <-finish:
+			return
+		default:
+			inputBytes := make([]byte, 4096)
+			err := protobuf.Decode(inputBytes, &msg)
+			if err != nil {
+				log.LLvl1(err)
+			}
+			receive <- msg
+		}
 	}
 }
 
-func SendMessage(message *PingMsg, srcAddress string, dstAddress string) {
+//SendMessage lets a server ping another server
+func SendMessage(message PingMsg, srcAddress string, dstAddress string) error {
 	destinationAddress, _ := net.ResolveUDPAddr("udp", dstAddress)
 	sourceAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
+
 	connection, err := net.DialUDP("udp", sourceAddress, destinationAddress)
 	if err != nil {
-		return
+		return err
 	}
 	defer connection.Close()
-	var buffer bytes.Buffer
-	encoder := gob.NewEncoder(&buffer)
-	for {
-		encoder.Encode(message)
-		connection.Write(buffer.Bytes())
-		buffer.Reset()
+
+	encoded, err := protobuf.Encode(&message)
+	if err != nil {
+		return err
 	}
+	connection.Write(encoded)
+	return nil
 }
 
 /*c, err := icmp.ListenPacket("udp6", "fe80::1%en0")

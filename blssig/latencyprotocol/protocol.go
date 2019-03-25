@@ -3,7 +3,6 @@ package latencyprotocol
 import (
 	"errors"
 	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/onet/v3"
 	//"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
 	sigAlg "golang.org/x/crypto/ed25519"
@@ -14,7 +13,7 @@ import (
 const nbLatencies = 5
 
 //NewNode creates a new Node, initializes a new Block for the chain, and gets latencies for it
-func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.SuiteBn256, chain *Chain) (*Node, error) {
+func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, chain *Chain) (*Node, error) {
 
 	pubKey, privKey, err := sigAlg.GenerateKey(nil)
 	if err != nil {
@@ -28,7 +27,9 @@ func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.Sui
 	//create new block
 	newBlock := &Block{ID: nodeID, Latencies: latencies}
 
-	receiverChannel := InitListening(id.Address.NetworkAddress())
+	finish := make(<-chan bool)
+
+	receiverChannel := InitListening(id.Address.NetworkAddress(), finish)
 
 	BlockChannel := make(chan Block, 1)
 
@@ -44,7 +45,7 @@ func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.Sui
 	}
 
 	// send pings
-	nbLatenciesNeeded := min(nbLatencies, len(roster.List))
+	nbLatenciesNeeded := min(nbLatencies, len(chain.Blocks))
 
 	//this message loops forever handling incoming messages
 	//its job is to put together latencies based on incoming messages and adding them to the block construction
@@ -55,10 +56,11 @@ func NewNode(id *network.ServerIdentity, roster *onet.Roster, suite *pairing.Sui
 
 }
 
-func (Node *Node) RefreshBlock(roster *onet.Roster, chain *Chain) {
+//AddBlock lets a node add a new block to a chain
+func (Node *Node) AddBlock(chain *Chain) {
 
 	// send pings
-	nbLatenciesNeeded := min(nbLatencies, len(roster.List))
+	nbLatenciesNeeded := min(nbLatencies, len(chain.Blocks))
 
 	//for now just ping the first ones
 	for i := 0; i < nbLatenciesNeeded; i++ {
@@ -245,4 +247,6 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, chain *Chain
 		}
 
 	}
+
+	return
 }
