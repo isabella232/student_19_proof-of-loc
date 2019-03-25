@@ -30,17 +30,24 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 	ready <- true
 	var msg PingMsg
 	for {
+		log.LLvl1("looping")
 		select {
 		case <-finish:
 			log.LLvl1("Listen stopping")
+			connection.Close()
 			return
 		default:
 			inputBytes := make([]byte, 4096)
-			err := protobuf.Decode(inputBytes, &msg)
+			_, _, err := connection.ReadFrom(inputBytes)
+			if err != nil {
+				log.LLvl1(err)
+			}
+			err = protobuf.Decode(inputBytes, &msg)
 			if err != nil {
 				log.LLvl1(err)
 			}
 			receive <- msg
+			log.LLvl1("Finished sending message")
 		}
 	}
 }

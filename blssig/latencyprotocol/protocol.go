@@ -13,7 +13,7 @@ import (
 const nbLatencies = 5
 
 //NewNode creates a new Node, initializes a new Block for the chain, and gets latencies for it
-func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, chain *Chain) (*Node, *chan bool, error) {
+func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, nbLatencies int) (*Node, chan bool, error) {
 
 	log.LLvl1("Creating new node")
 	pubKey, privKey, err := sigAlg.GenerateKey(nil)
@@ -53,15 +53,12 @@ func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, chain *Chain
 		BlockChannel:            BlockChannel,
 	}
 
-	// send pings
-	nbLatenciesNeeded := min(nbLatencies, len(chain.Blocks))
-
 	//this message loops forever handling incoming messages
 	//its job is to put together latencies based on incoming messages and adding them to the block construction
 	//When enough new latencies are collected, a new block is generated and sent in to be signed, and the process starts anew
-	go handleIncomingMessages(newNode, nbLatenciesNeeded, chain, finishHandling)
+	go handleIncomingMessages(newNode, nbLatencies, finishHandling)
 
-	return newNode, &finish, nil
+	return newNode, finish, nil
 
 }
 
@@ -82,6 +79,7 @@ func passOnEndSignal(src chan bool, dst1 chan bool, dst2 chan bool) {
 func (Node *Node) AddBlock(chain *Chain) {
 
 	// send pings
+	log.LLvl1("Adding Block")
 	nbLatenciesNeeded := min(nbLatencies, len(chain.Blocks))
 
 	//for now just ping the first ones
@@ -224,39 +222,45 @@ func Pythagoras(p1 time.Duration, p2 time.Duration) time.Duration {
 	return ((p1 ^ 2) + (p2 ^ 2)) ^ (1 / 2)
 }
 
-func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, chain *Chain, finish chan bool) {
+func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan bool) {
 
-	for true {
-		newMsg := <-Node.IncomingMessageChannel
-		msgSeqNb := newMsg.SeqNb
+	for {
 
 		select {
 		case <-finish:
 			return
 		default:
+			newMsg := <-Node.IncomingMessageChannel
+			log.LLvl1(newMsg)
+			msgSeqNb := newMsg.SeqNb
 
 			switch msgSeqNb {
 			case 1:
+				log.LLvl1("Incoming message 1")
 				msgContent, messageOkay := Node.checkMessage1(&newMsg)
 				if messageOkay {
 					Node.sendMessage2(&newMsg, msgContent)
 				}
 			case 2:
+				log.LLvl1("Incoming message 2")
 				msgContent, messageOkay := Node.checkMessage2(&newMsg)
 				if messageOkay {
 					Node.sendMessage3(&newMsg, msgContent)
 				}
 			case 3:
+				log.LLvl1("Incoming message 3")
 				msgContent, messageOkay := Node.checkMessage3(&newMsg)
 				if messageOkay {
 					Node.sendMessage4(&newMsg, msgContent)
 				}
 			case 4:
+				log.LLvl1("Incoming message 4")
 				msgContent, messageOkay := Node.checkMessage4(&newMsg)
 				if messageOkay {
 					Node.sendMessage5(&newMsg, msgContent)
 				}
 			case 5:
+				log.LLvl1("Incoming message 5")
 				doubleSignedLatency, messageOkay := Node.checkMessage5(&newMsg)
 				if messageOkay {
 					Node.BlockSkeleton.Latencies[string(newMsg.PublicKey)] = *doubleSignedLatency
@@ -265,16 +269,19 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, chain *Chain
 					Node.LatenciesInConstruction[string(newMsg.PublicKey)] = nil
 					Node.NbLatenciesRefreshed++
 
-					if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock {
+					if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock && nbLatenciesForNewBlock > 0 {
 						Node.BlockChannel <- *Node.BlockSkeleton
 						Node.BlockSkeleton.Latencies = make(map[string]ConfirmedLatency)
 
 					}
 				}
+			default:
+				//log.LLvl1("Incorrect message id")
+				//log.LLvl1(msgSeqNb)
+				//return
 			}
 		}
 
 	}
 
-	return
 }

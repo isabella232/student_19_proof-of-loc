@@ -8,22 +8,22 @@ import (
 	"testing"
 )
 
-const srcAddress = "127.0.0.1"
-const dstAddress = ":2000"
+const srcAddress = "127.0.0.1:2001"
+const dstAddress = "127.0.0.1:2000"
 
 func TestListeningInit(t *testing.T) {
 	finish := make(chan bool, 1)
 	ready := make(chan bool, 1)
 	InitListening(dstAddress, finish, ready)
+	finish <- true
 	readySig := <-ready
 	require.True(t, readySig)
-	finish <- true
 }
 
 func TestSendMessage(t *testing.T) {
 	local := onet.NewTCPTest(tSuite)
 
-	_, el, _ := local.GenTree(12, false)
+	_, el, _ := local.GenTree(2, false)
 
 	defer local.CloseAll()
 
@@ -34,18 +34,16 @@ func TestSendMessage(t *testing.T) {
 
 	pub, _, _ := sigAlg.GenerateKey(nil)
 
-	msg := PingMsg{*el.List[0], *el.List[1], 0, pub, make([]byte, 0), make([]byte, 0)}
-
-	<-ready
+	msg := PingMsg{*el.List[0], *el.List[1], 10, pub, make([]byte, 0), make([]byte, 0)}
 
 	err := SendMessage(msg, srcAddress, dstAddress)
 
 	require.NoError(t, err)
+	finish <- true
 	received := <-receptionChannel
 	log.LLvl1("Got message")
 
 	require.NotNil(t, received)
-
-	finish <- true
+	require.Equal(t, 10, received.SeqNb)
 
 }

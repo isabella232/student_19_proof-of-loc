@@ -1,6 +1,7 @@
 package latencyprotocol
 
 import (
+	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
 	"go.dedis.ch/protobuf"
 	sigAlg "golang.org/x/crypto/ed25519"
@@ -63,6 +64,7 @@ type PingMsg5 struct {
 }
 
 func (Node *Node) sendMessage1(dstNodeID *NodeID) {
+	log.LLvl1("Sending message 1")
 
 	nonce := Nonce(rand.Int())
 	timestamp := time.Now()
@@ -75,6 +77,7 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) {
 	_, alreadyStarted := Node.LatenciesInConstruction[string(dstNodeID.PublicKey)]
 
 	if alreadyStarted {
+		log.LLvl1("Already started messaging this node")
 		return
 	}
 
@@ -95,7 +98,7 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) {
 
 	unsigned, err := protobuf.Encode(msgContent)
 	if err != nil {
-		//TODO
+		log.LLvl1("Problem encoding message")
 		return
 	}
 
@@ -114,11 +117,13 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) {
 	srcAddress := Node.ID.ServerID.Address.NetworkAddress()
 	dstAddress := dstNodeID.ServerID.Address.NetworkAddress()
 
+	log.LLvl1("Message departing")
 	SendMessage(msg, srcAddress, dstAddress)
 
 }
 
 func (Node *Node) checkMessage1(msg *PingMsg) (*PingMsg1, bool) {
+	log.LLvl1("Checking message 1")
 
 	newPubKey := msg.PublicKey
 
@@ -148,6 +153,7 @@ func (Node *Node) checkMessage1(msg *PingMsg) (*PingMsg1, bool) {
 }
 
 func (Node *Node) sendMessage2(msg *PingMsg, msgContent *PingMsg1) {
+	log.LLvl1("Sending message 2")
 
 	nonce := Nonce(rand.Int())
 
@@ -199,6 +205,7 @@ func (Node *Node) sendMessage2(msg *PingMsg, msgContent *PingMsg1) {
 }
 
 func (Node *Node) checkMessage2(msg *PingMsg) (*PingMsg2, bool) {
+	log.LLvl1("Checking message 2")
 
 	senderPubKey := msg.PublicKey
 
@@ -242,6 +249,7 @@ func (Node *Node) checkMessage2(msg *PingMsg) (*PingMsg2, bool) {
 }
 
 func (Node *Node) sendMessage3(msg *PingMsg, msgContent *PingMsg2) {
+	log.LLvl1("Sending message 3")
 
 	latencyConstr := Node.LatenciesInConstruction[string(msg.PublicKey)]
 	latencyConstr.CurrentMsgNb += 2
@@ -288,6 +296,8 @@ func (Node *Node) sendMessage3(msg *PingMsg, msgContent *PingMsg2) {
 
 func (Node *Node) checkMessage3(msg *PingMsg) (*PingMsg3, bool) {
 
+	log.LLvl1("Checking message 3")
+
 	senderPubKey := msg.PublicKey
 
 	//check if we are building a latency for this
@@ -328,6 +338,7 @@ func (Node *Node) checkMessage3(msg *PingMsg) (*PingMsg3, bool) {
 }
 
 func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
+	log.LLvl1("Sending message 4")
 
 	latencyConstr := Node.LatenciesInConstruction[string(msg.PublicKey)]
 	latencyConstr.CurrentMsgNb += 2
@@ -397,6 +408,7 @@ func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
 }
 
 func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
+	log.LLvl1("Checking message 4")
 
 	senderPubKey := msg.PublicKey
 
@@ -433,6 +445,7 @@ func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
 }
 
 func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLatency {
+	log.LLvl1("Sending message 5")
 
 	latencyConstr := Node.LatenciesInConstruction[string(msg.PublicKey)]
 	latencyConstr.CurrentMsgNb += 2
@@ -498,6 +511,7 @@ func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLat
 }
 
 func (Node *Node) checkMessage5(msg *PingMsg) (*ConfirmedLatency, bool) {
+	log.LLvl1("Checking message 5")
 
 	senderPubKey := msg.PublicKey
 
