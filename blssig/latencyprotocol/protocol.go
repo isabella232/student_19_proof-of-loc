@@ -3,7 +3,7 @@ package latencyprotocol
 import (
 	"errors"
 	"go.dedis.ch/kyber/v3/pairing"
-	//"go.dedis.ch/onet/v3/log"
+	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"strconv"
@@ -13,11 +13,12 @@ import (
 const nbLatencies = 5
 
 //NewNode creates a new Node, initializes a new Block for the chain, and gets latencies for it
-func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, chain *Chain) (*Node, error) {
+func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, chain *Chain) (*Node, *chan bool, error) {
 
+	log.LLvl1("Creating new node")
 	pubKey, privKey, err := sigAlg.GenerateKey(nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	nodeID := &NodeID{id, pubKey}
@@ -27,9 +28,17 @@ func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, chain *Chain
 	//create new block
 	newBlock := &Block{ID: nodeID, Latencies: latencies}
 
-	finish := make(<-chan bool)
+	udpReady := make(chan bool, 1)
+	finish := make(chan bool, 1)
 
-	receiverChannel := InitListening(id.Address.NetworkAddress(), finish)
+	finishListening := make(chan bool, 1)
+	finishHandling := make(chan bool, 1)
+
+	go passOnEndSignal(finish, finishHandling, finishListening)
+
+	receiverChannel := InitListening(id.Address.NetworkAddress(), finishListening, udpReady)
+
+	<-udpReady
 
 	BlockChannel := make(chan Block, 1)
 
@@ -50,10 +59,23 @@ func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, chain *Chain
 	//this message loops forever handling incoming messages
 	//its job is to put together latencies based on incoming messages and adding them to the block construction
 	//When enough new latencies are collected, a new block is generated and sent in to be signed, and the process starts anew
-	go handleIncomingMessages(newNode, nbLatenciesNeeded, chain)
+	go handleIncomingMessages(newNode, nbLatenciesNeeded, chain, finishHandling)
 
-	return newNode, nil
+	return newNode, &finish, nil
 
+}
+
+func passOnEndSignal(src chan bool, dst1 chan bool, dst2 chan bool) {
+	for {
+		select {
+		case <-src:
+			log.LLvl1("Passing on end signal")
+			dst1 <- true
+			dst2 <- true
+			return
+		default:
+		}
+	}
 }
 
 //AddBlock lets a node add a new block to a chain
@@ -202,46 +224,52 @@ func Pythagoras(p1 time.Duration, p2 time.Duration) time.Duration {
 	return ((p1 ^ 2) + (p2 ^ 2)) ^ (1 / 2)
 }
 
-func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, chain *Chain) {
+func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, chain *Chain, finish chan bool) {
 
 	for true {
 		newMsg := <-Node.IncomingMessageChannel
 		msgSeqNb := newMsg.SeqNb
 
-		switch msgSeqNb {
-		case 1:
-			msgContent, messageOkay := Node.checkMessage1(&newMsg)
-			if messageOkay {
-				Node.sendMessage2(&newMsg, msgContent)
-			}
-		case 2:
-			msgContent, messageOkay := Node.checkMessage2(&newMsg)
-			if messageOkay {
-				Node.sendMessage3(&newMsg, msgContent)
-			}
-		case 3:
-			msgContent, messageOkay := Node.checkMessage3(&newMsg)
-			if messageOkay {
-				Node.sendMessage4(&newMsg, msgContent)
-			}
-		case 4:
-			msgContent, messageOkay := Node.checkMessage4(&newMsg)
-			if messageOkay {
-				Node.sendMessage5(&newMsg, msgContent)
-			}
-		case 5:
-			doubleSignedLatency, messageOkay := Node.checkMessage5(&newMsg)
-			if messageOkay {
-				Node.BlockSkeleton.Latencies[string(newMsg.PublicKey)] = *doubleSignedLatency
+		select {
+		case <-finish:
+			return
+		default:
 
-				//get rid of contructor
-				Node.LatenciesInConstruction[string(newMsg.PublicKey)] = nil
-				Node.NbLatenciesRefreshed++
+			switch msgSeqNb {
+			case 1:
+				msgContent, messageOkay := Node.checkMessage1(&newMsg)
+				if messageOkay {
+					Node.sendMessage2(&newMsg, msgContent)
+				}
+			case 2:
+				msgContent, messageOkay := Node.checkMessage2(&newMsg)
+				if messageOkay {
+					Node.sendMessage3(&newMsg, msgContent)
+				}
+			case 3:
+				msgContent, messageOkay := Node.checkMessage3(&newMsg)
+				if messageOkay {
+					Node.sendMessage4(&newMsg, msgContent)
+				}
+			case 4:
+				msgContent, messageOkay := Node.checkMessage4(&newMsg)
+				if messageOkay {
+					Node.sendMessage5(&newMsg, msgContent)
+				}
+			case 5:
+				doubleSignedLatency, messageOkay := Node.checkMessage5(&newMsg)
+				if messageOkay {
+					Node.BlockSkeleton.Latencies[string(newMsg.PublicKey)] = *doubleSignedLatency
 
-				if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock {
-					Node.BlockChannel <- *Node.BlockSkeleton
-					Node.BlockSkeleton.Latencies = make(map[string]ConfirmedLatency)
+					//get rid of contructor
+					Node.LatenciesInConstruction[string(newMsg.PublicKey)] = nil
+					Node.NbLatenciesRefreshed++
 
+					if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock {
+						Node.BlockChannel <- *Node.BlockSkeleton
+						Node.BlockSkeleton.Latencies = make(map[string]ConfirmedLatency)
+
+					}
 				}
 			}
 		}

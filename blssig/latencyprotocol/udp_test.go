@@ -12,8 +12,11 @@ const srcAddress = "127.0.0.1"
 const dstAddress = ":2000"
 
 func TestListeningInit(t *testing.T) {
-	finish := make(chan bool)
-	InitListening(dstAddress, finish)
+	finish := make(chan bool, 1)
+	ready := make(chan bool, 1)
+	InitListening(dstAddress, finish, ready)
+	readySig := <-ready
+	require.True(t, readySig)
 	finish <- true
 }
 
@@ -24,13 +27,16 @@ func TestSendMessage(t *testing.T) {
 
 	defer local.CloseAll()
 
-	finish := make(chan bool)
+	finish := make(chan bool, 1)
+	ready := make(chan bool, 1)
 
-	receptionChannel := InitListening(dstAddress, finish)
+	receptionChannel := InitListening(dstAddress, finish, ready)
 
 	pub, _, _ := sigAlg.GenerateKey(nil)
 
 	msg := PingMsg{*el.List[0], *el.List[1], 0, pub, make([]byte, 0), make([]byte, 0)}
+
+	<-ready
 
 	err := SendMessage(msg, srcAddress, dstAddress)
 

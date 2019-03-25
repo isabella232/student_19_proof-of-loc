@@ -1,9 +1,9 @@
 package latencyprotocol
 
 import (
-	//"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v3/pairing"
-	"go.dedis.ch/onet/v3"
+	//"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"testing"
 )
@@ -16,22 +16,18 @@ func TestMain(m *testing.M) {
 
 func TestNewNodeCreation(t *testing.T) {
 
-	local := onet.NewTCPTest(tSuite)
-
-	N := 1
-	x := 1
-	// generate 3 hosts, they don't connect, they process messages, and they
-	// don't register the tree or entitylist
-	_, el, _ := local.GenTree(1, false)
-
-	defer local.CloseAll()
+	N := 3
+	x := 2
 
 	chain := initChain(N, x, accurate)
 
-	_, err := NewNode(el.List[0], tSuite, chain)
+	log.LLvl1("Calling NewNode")
+	_, finish, err := NewNode(chain.Blocks[0].ID.ServerID, tSuite, chain)
 
-	log.LLvl1(err)
+	log.LLvl1("Made new node")
 
-	//require.NoError(t, err)
+	*finish <- true
+
+	require.NoError(t, err)
 
 }

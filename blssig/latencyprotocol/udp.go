@@ -8,14 +8,14 @@ import (
 )
 
 //InitListening allows the start of listening for pings on the server
-func InitListening(srcAddress string, finish <-chan bool) <-chan PingMsg {
+func InitListening(srcAddress string, finish <-chan bool, ready chan<- bool) <-chan PingMsg {
 	log.LLvl1("Init UDP listening on " + srcAddress)
 	receive := make(chan PingMsg, 10)
-	go listen(receive, srcAddress, finish)
+	go listen(receive, srcAddress, finish, ready)
 	return receive
 }
 
-func listen(receive chan PingMsg, srcAddress string, finish <-chan bool) {
+func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready chan<- bool) {
 
 	log.LLvl1("Setting up address")
 	nodeAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
@@ -27,11 +27,12 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool) {
 	}
 	defer connection.Close()
 
-	log.LLvl1("Wait for message")
+	ready <- true
 	var msg PingMsg
 	for {
 		select {
 		case <-finish:
+			log.LLvl1("Listen stopping")
 			return
 		default:
 			inputBytes := make([]byte, 4096)
