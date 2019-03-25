@@ -31,17 +31,17 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 	var msg PingMsg
 	for {
 		log.LLvl1("looping")
-		select {
-		case <-finish:
+		if len(finish) > 0 {
 			log.LLvl1("Listen stopping")
 			connection.Close()
 			return
-		default:
-			inputBytes := make([]byte, 4096)
-			_, _, err := connection.ReadFrom(inputBytes)
-			if err != nil {
-				log.LLvl1(err)
-			}
+		}
+		inputBytes := make([]byte, 4096)
+		len, _, err := connection.ReadFrom(inputBytes)
+		if err != nil {
+			log.LLvl1(err)
+		}
+		if len > 0 {
 			err = protobuf.Decode(inputBytes, &msg)
 			if err != nil {
 				log.LLvl1(err)

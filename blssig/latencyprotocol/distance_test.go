@@ -29,8 +29,6 @@ of randomness that nodes use. Check the results by varying the number x and the 
 
 func initChain(N int, x int, src sourceType) *Chain {
 	local := onet.NewTCPTest(distanceSuite)
-	// generate 3 hosts, they don't connect, they process messages, and they
-	// don't register the tree or entitylist
 	_, el, _ := local.GenTree(N, false)
 	defer local.CloseAll()
 

@@ -39,11 +39,11 @@ func TestSendMessage(t *testing.T) {
 	err := SendMessage(msg, srcAddress, dstAddress)
 
 	require.NoError(t, err)
-	finish <- true
 	received := <-receptionChannel
 	log.LLvl1("Got message")
 
 	require.NotNil(t, received)
 	require.Equal(t, 10, received.SeqNb)
+	finish <- true
 
 }

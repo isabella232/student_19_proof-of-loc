@@ -25,9 +25,9 @@ func TestNewNodeCreation(t *testing.T) {
 	log.LLvl1("Calling NewNode")
 	newNode, finish, err := NewNode(el.List[0], tSuite, 2)
 
-	log.LLvl1("Made new node")
-
 	finish <- true
+
+	log.LLvl1("Made new node")
 
 	require.NoError(t, err)
 	require.NotNil(t, newNode)
