@@ -91,7 +91,7 @@ func TestSignatureRequestApi(t *testing.T) {
 	require.Nil(t, err, "Propagation incorrect")
 }
 
-func TestNewBlockApi(t *testing.T) {
+/*func TestNewNodeApi(t *testing.T) {
 
 	log.SetDebugVisible(1)
 
@@ -101,16 +101,16 @@ func TestNewBlockApi(t *testing.T) {
 
 	_, el, _ := local.GenTree(3, false)
 
-	newNode1 := local.GenServers(1)
-	newNode2 := local.GenServers(1)
+	newNodeID1 := local.GenServers(1)
+	newNodeID2 := local.GenServers(1)
 	defer local.CloseAll()
 
-	err := client.ProposeNewBlock(newNode1[0].ServerIdentity, el)
+	_, err := client.ProposeNewNode(newNodeID1[0].ServerIdentity, el)
 
 	require.NoError(t, err)
 
-	err = client.ProposeNewBlock(newNode2[0].ServerIdentity, el)
+	_, err = client.ProposeNewNode(newNodeID2[0].ServerIdentity, el)
 
 	require.NoError(t, err)
 
-}
+}*/
