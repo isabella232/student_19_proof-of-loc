@@ -101,20 +101,23 @@ func TestApproximateDistanceAllInformation(t *testing.T) {
 
 	log.Print(exists)
 
-	d12, err := chain.Blocks[0].ApproximateDistance(chain.Blocks[1], chain.Blocks[2], 10)
+	d12, isValid12, err := chain.Blocks[0].ApproximateDistance(chain.Blocks[1], chain.Blocks[2], 10)
 
 	require.Nil(t, err, "Error")
 	require.Equal(t, d12, time.Duration(10*(1+2+1)))
+	require.True(t, isValid12)
 
-	d02, err := chain.Blocks[1].ApproximateDistance(chain.Blocks[0], chain.Blocks[2], 10)
+	d02, isValid02, err := chain.Blocks[1].ApproximateDistance(chain.Blocks[0], chain.Blocks[2], 10)
 
 	require.Nil(t, err, "Error")
 	require.Equal(t, d02, time.Duration(10*(2+1)))
+	require.True(t, isValid02)
 
-	d01, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[0], chain.Blocks[1], 10)
+	d01, isValid01, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[0], chain.Blocks[1], 10)
 
 	require.Nil(t, err, "Error")
 	require.Equal(t, d01, time.Duration(10*(1+1)))
+	require.True(t, isValid01)
 
 }
 
@@ -125,9 +128,10 @@ func TestApproximateDistanceInaccurateInformation(t *testing.T) {
 
 	chain := initChain(N, x, inaccurate)
 
-	_, err := chain.Blocks[0].ApproximateDistance(chain.Blocks[1], chain.Blocks[2], 0)
+	_, isValid, err := chain.Blocks[0].ApproximateDistance(chain.Blocks[1], chain.Blocks[2], 0)
 
 	require.NotNil(t, err, "Inaccuracy error should have been reported")
+	require.False(t, isValid)
 
 }
 
@@ -138,6 +142,7 @@ func TestApproximateDistanceIncompleteInformation(t *testing.T) {
 	N1---(d01 + d10/2)----N0----d02----N2
 
 	N1-N2 unknown by any nodes -> pythagoras
+	N0 - N2 only given by one node -> not trustworthy
 
 
 	*/
@@ -151,20 +156,22 @@ func TestApproximateDistanceIncompleteInformation(t *testing.T) {
 
 	chain := initChain(N, x, inaccurate)
 
-	d01, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[0], chain.Blocks[1], 10000)
+	d01, isValid01, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[0], chain.Blocks[1], 10000)
 
 	require.Nil(t, err, "Error")
 	require.Equal(t, d01, expectedD01)
+	require.True(t, isValid01)
 
-	d02, err := chain.Blocks[1].ApproximateDistance(chain.Blocks[0], chain.Blocks[2], 10000)
+	_, isValid02, err := chain.Blocks[1].ApproximateDistance(chain.Blocks[0], chain.Blocks[2], 10000)
 
-	require.Nil(t, err, "Error")
-	require.Equal(t, d02, expectedD02)
+	require.NotNil(t, err)
+	require.False(t, isValid02)
 
-	d12, err := chain.Blocks[0].ApproximateDistance(chain.Blocks[1], chain.Blocks[2], 10000)
+	d12, isValid12, err := chain.Blocks[0].ApproximateDistance(chain.Blocks[1], chain.Blocks[2], 10000)
 
 	require.Nil(t, err, "Error")
 	require.Equal(t, d12, expectedD12)
+	require.True(t, isValid12)
 
 }
 
@@ -175,8 +182,9 @@ func TestApproximateDistanceMissingInformation(t *testing.T) {
 
 	chain := initChain(N, x, accurate)
 
-	_, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[3], chain.Blocks[4], 0)
+	_, isValid, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[3], chain.Blocks[4], 0)
 
 	require.NotNil(t, err, "Should not have sufficient information to approximate distance")
+	require.False(t, isValid)
 
 }

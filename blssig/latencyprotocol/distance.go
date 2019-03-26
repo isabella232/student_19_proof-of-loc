@@ -8,6 +8,26 @@ import (
 
 const delta = time.Duration(1000 * time.Millisecond)
 
+func (A *Block) to(B *Block) (time.Duration, bool) {
+	aToB, aToBKnown := A.getLatency(B)
+	bToA, bToAKnown := B.getLatency(A)
+
+	if aToBKnown && bToAKnown {
+		return (aToB + bToA) / 2, true
+	}
+
+	if aToBKnown {
+		return aToB, true
+	}
+
+	if bToAKnown {
+		return bToA, true
+	}
+
+	return time.Duration(0), false
+
+}
+
 /*ApproximateDistance is a function to approximate the distance between two given nodes, e.g.,
 node A wants to approximate the distance between nodes B and C. Node A relies on the information
 in the blockchain about distances to B, C, between B and C and its own estimations to B and C,
@@ -23,11 +43,22 @@ func (A *Block) ApproximateDistance(B *Block, C *Block, delta time.Duration) (ti
 	bToC, bToCKnown := B.getLatency(C)
 	cToB, cToBKnown := C.getLatency(B)
 
+	//the nodes know each other
 	if cToBKnown && bToCKnown {
+
+		//they say different things
 		if timesContradictory(bToC, cToB, delta) {
 			return time.Duration(0), false, errors.New("Distances contradictory: " + strconv.Itoa(int(time.Duration(bToC-cToB))))
 		}
-		return time.Duration((cToB + bToC) / 2), true, nil
+
+		lat := time.Duration((cToB + bToC) / 2)
+
+		if aToCKnown && aToBKnown {
+			if aToC+aToB < lat {
+				return time.Duration(0), false, errors.New("Distances contradictory: " + strconv.Itoa(int(time.Duration(bToC-cToB))))
+			}
+		}
+		return lat, true, nil
 	}
 
 	if aToBKnown && bToAKnown {
@@ -131,6 +162,7 @@ func timesContradictory(time1 time.Duration, time2 time.Duration, delta time.Dur
 	return time.Duration(time1-time2) > delta || time.Duration(time2-time1) > delta
 }
 
+//ApproximateOverChain approximates a distance between two nodes over a chain
 func (chain *Chain) ApproximateOverChain(B *Node, C *Node) (time.Duration, error) {
 
 	collectedDistances := make([]time.Duration, 0)

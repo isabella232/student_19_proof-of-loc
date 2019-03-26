@@ -5,6 +5,7 @@ import (
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
 	sigAlg "golang.org/x/crypto/ed25519"
+	"sync"
 )
 
 const nbLatencies = 5
@@ -25,15 +26,17 @@ func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, nbLatencies 
 	//create new block
 	newBlock := &Block{ID: nodeID, Latencies: latencies}
 
+	var wg sync.WaitGroup
 	udpReady := make(chan bool, 1)
-	finish := make(chan bool, 1)
 
+	finish := make(chan bool, 1)
 	finishListening := make(chan bool, 1)
 	finishHandling := make(chan bool, 1)
 
-	go passOnEndSignal(finish, finishHandling, finishListening)
+	wg.Add(1)
+	go passOnEndSignal(finish, finishHandling, finishListening, &wg)
 
-	receiverChannel := InitListening(id.Address.NetworkAddress(), finishListening, udpReady)
+	receiverChannel := InitListening(id.Address.NetworkAddress(), finishListening, udpReady, &wg)
 
 	<-udpReady
 
@@ -53,19 +56,21 @@ func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, nbLatencies 
 	//this message loops forever handling incoming messages
 	//its job is to put together latencies based on incoming messages and adding them to the block construction
 	//When enough new latencies are collected, a new block is generated and sent in to be signed, and the process starts anew
-	go handleIncomingMessages(newNode, nbLatencies, finishHandling)
+	wg.Add(1)
+	go handleIncomingMessages(newNode, nbLatencies, finishHandling, &wg)
 
 	return newNode, finish, nil
 
 }
 
-func passOnEndSignal(src chan bool, dst1 chan bool, dst2 chan bool) {
+func passOnEndSignal(src chan bool, dst1 chan bool, dst2 chan bool, wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-src:
 			log.LLvl1("Passing on end signal")
 			dst1 <- true
 			dst2 <- true
+			wg.Done()
 			return
 		default:
 		}
@@ -92,12 +97,13 @@ func min(a, b int) int {
 	return b
 }
 
-func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan bool) {
+func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan bool, wg *sync.WaitGroup) {
 
 	for {
 
 		select {
 		case <-finish:
+			wg.Done()
 			return
 		default:
 			newMsg := <-Node.IncomingMessageChannel

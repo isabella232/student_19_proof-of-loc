@@ -5,17 +5,21 @@ import (
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/protobuf"
 	"net"
+	"strings"
+	"sync"
+	"time"
 )
 
 //InitListening allows the start of listening for pings on the server
-func InitListening(srcAddress string, finish <-chan bool, ready chan<- bool) <-chan PingMsg {
+func InitListening(srcAddress string, finish <-chan bool, ready chan<- bool, wg *sync.WaitGroup) <-chan PingMsg {
 	log.LLvl1("Init UDP listening on " + srcAddress)
-	receive := make(chan PingMsg, 10)
-	go listen(receive, srcAddress, finish, ready)
+	receive := make(chan PingMsg, 100)
+	wg.Add(1)
+	go listen(receive, srcAddress, finish, ready, wg)
 	return receive
 }
 
-func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready chan<- bool) {
+func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready chan<- bool, wg *sync.WaitGroup) {
 
 	log.LLvl1("Setting up address")
 	nodeAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
@@ -28,26 +32,29 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 	defer connection.Close()
 
 	ready <- true
-	var msg PingMsg
 	for {
-		log.LLvl1("looping")
-		if len(finish) > 0 {
+		select {
+		case <-finish:
 			log.LLvl1("Listen stopping")
 			connection.Close()
+			wg.Done()
 			return
-		}
-		inputBytes := make([]byte, 4096)
-		len, _, err := connection.ReadFrom(inputBytes)
-		if err != nil {
-			log.LLvl1(err)
-		}
-		if len > 0 {
-			err = protobuf.Decode(inputBytes, &msg)
-			if err != nil {
+		default:
+			log.LLvl1("New array")
+			inputBytes := make([]byte, 4096)
+			connection.SetReadDeadline(time.Now().Add(5 * time.Millisecond))
+			len, _, err := connection.ReadFrom(inputBytes)
+			if err != nil && !strings.Contains(err.Error(), "i/o timeout") {
 				log.LLvl1(err)
 			}
-			receive <- msg
-			log.LLvl1("Finished sending message")
+			if len > 0 {
+				var msg PingMsg
+				err = protobuf.Decode(inputBytes, &msg)
+				if err != nil {
+					log.LLvl1(err)
+				}
+				receive <- msg
+			}
 		}
 	}
 }
