@@ -107,8 +107,7 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 		case <-finish:
 			wg.Done()
 			return
-		default:
-			newMsg := <-Node.IncomingMessageChannel
+		case newMsg := <-Node.IncomingMessageChannel:
 			msgSeqNb := newMsg.SeqNb
 
 			switch msgSeqNb {
