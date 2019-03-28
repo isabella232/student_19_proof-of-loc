@@ -132,23 +132,39 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 				}
 			case 4:
 				log.LLvl1("Incoming message 4")
-				msgContent, messageOkay := Node.checkMessage4(&newMsg)
+				msgContent, confirmedLatency, messageOkay := Node.checkMessage4(&newMsg)
 				if messageOkay {
 					Node.sendMessage5(&newMsg, msgContent)
-				}
-			case 5:
-				log.LLvl1("Incoming message 5")
-				doubleSignedLatency, messageOkay := Node.checkMessage5(&newMsg)
-				if messageOkay {
 
+					log.LLvl1("Adding new latency to block")
 					encodedKey := base64.StdEncoding.EncodeToString(newMsg.PublicKey)
-					Node.BlockSkeleton.Latencies[encodedKey] = *doubleSignedLatency //signature content, not whole message
+					Node.BlockSkeleton.Latencies[encodedKey] = *confirmedLatency //signature content, not whole message
 
 					//get rid of contructor
 					Node.LatenciesInConstruction[encodedKey] = nil
 					Node.NbLatenciesRefreshed++
 
 					if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock && nbLatenciesForNewBlock > 0 {
+						log.LLvl1("Sending up new block")
+						Node.BlockChannel <- *Node.BlockSkeleton
+						Node.BlockSkeleton.Latencies = make(map[string]ConfirmedLatency)
+
+					}
+				}
+			case 5:
+				log.LLvl1("Incoming message 5")
+				doubleSignedLatency, messageOkay := Node.checkMessage5(&newMsg)
+				if messageOkay {
+
+					log.LLvl1("Adding new latency to block")
+					encodedKey := base64.StdEncoding.EncodeToString(newMsg.PublicKey)
+					Node.BlockSkeleton.Latencies[encodedKey] = *doubleSignedLatency
+					//get rid of contructor
+					Node.LatenciesInConstruction[encodedKey] = nil
+					Node.NbLatenciesRefreshed++
+
+					if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock && nbLatenciesForNewBlock > 0 {
+						log.LLvl1("Sending up new block")
 						Node.BlockChannel <- *Node.BlockSkeleton
 						Node.BlockSkeleton.Latencies = make(map[string]ConfirmedLatency)
 

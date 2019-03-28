@@ -45,7 +45,7 @@ func TestAddBlock(t *testing.T) {
 
 	chain := &Chain{make([]*Block, 1), []byte("testBucket")}
 
-	newNode1, finish1, err := NewNode(el.List[0], el.List[1].Address, tSuite, 0)
+	newNode1, finish1, err := NewNode(el.List[0], el.List[1].Address, tSuite, 1)
 	require.NoError(t, err)
 
 	chain.Blocks[0] = &Block{newNode1.ID, make(map[string]ConfirmedLatency, 0)}
@@ -56,11 +56,21 @@ func TestAddBlock(t *testing.T) {
 
 	newNode2.AddBlock(chain)
 
-	block := <-newNode2.BlockChannel
+	block1 := <-newNode1.BlockChannel
 
-	require.NotNil(t, block)
+	log.LLvl1("Channel 1 got its block")
 
 	finish1 <- true
+
+	block2 := <-newNode2.BlockChannel
+
 	finish2 <- true
+
+	log.LLvl1("Channel 2 got its block")
+
+	require.NotNil(t, block1)
+	require.NotNil(t, block2)
+
+	//log.LLvl1(block1)
 
 }

@@ -445,7 +445,7 @@ func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
 
 }
 
-func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
+func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, *ConfirmedLatency, bool) {
 	log.LLvl1("Checking message 4")
 
 	senderPubKey := msg.PublicKey
@@ -454,7 +454,7 @@ func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
 	sigCorrect := sigAlg.Verify(senderPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
 		log.LLvl1("Signature incorrest")
-		return nil, false
+		return nil, nil, false
 	}
 
 	//check if we are building a latency for this
@@ -463,7 +463,7 @@ func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
 
 	if !alreadyStarted {
 		log.LLvl1("Not started yet")
-		return nil, false
+		return nil, nil, false
 	}
 
 	//extract content
@@ -471,7 +471,7 @@ func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
 		log.LLvl1(err)
-		return nil, false
+		return nil, nil, false
 	}
 
 	sentTimestamp := content.SignedForeignLatency.Timestamp
@@ -480,10 +480,18 @@ func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
 	//check freshness
 	if !isFresh(sentTimestamp, freshnessDelta) {
 		log.LLvl1("Not fresh enough")
-		return nil, false
+		return nil, nil, false
 	}
 
-	return &content, true
+	newLatency := &ConfirmedLatency{
+		Latency:            latencyConstr.Latency,
+		Timestamp:          sentTimestamp,
+		SignedConfirmation: content.DoubleSignedForeignLatency,
+	}
+
+	log.LLvl1("Returning new latency from message 5")
+
+	return &content, newLatency, true
 
 }
 
