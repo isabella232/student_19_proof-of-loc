@@ -1,11 +1,13 @@
 package latencyprotocol
 
 import (
+	"encoding/base64"
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"testing"
+	"time"
 )
 
 var tSuite = pairing.NewSuiteBn256()
@@ -71,6 +73,19 @@ func TestAddBlock(t *testing.T) {
 	require.NotNil(t, block1)
 	require.NotNil(t, block2)
 
-	//log.LLvl1(block1)
+	require.Equal(t, newNode1.ID, block1.ID)
+	require.Equal(t, newNode2.ID, block2.ID)
+
+	require.Len(t, block1.Latencies, 1)
+	require.Equal(t, 1, len(block2.Latencies))
+	require.Contains(t, block1.Latencies, base64.StdEncoding.EncodeToString(block2.ID.PublicKey))
+	require.Contains(t, block2.Latencies, base64.StdEncoding.EncodeToString(block1.ID.PublicKey))
+
+	latency1 := block1.Latencies[base64.StdEncoding.EncodeToString(block2.ID.PublicKey)].Latency
+	latency2 := block2.Latencies[base64.StdEncoding.EncodeToString(block1.ID.PublicKey)].Latency
+
+	latencyDiff := latency1 - latency2
+
+	require.True(t, (latencyDiff < 10*time.Millisecond))
 
 }
