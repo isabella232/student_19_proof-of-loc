@@ -19,11 +19,11 @@ func TestNewNodeCreation(t *testing.T) {
 	local := onet.NewTCPTest(tSuite)
 	// generate 3 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
-	_, el, _ := local.GenTree(1, false)
+	_, el, _ := local.GenTree(2, false)
 	defer local.CloseAll()
 
 	log.LLvl1("Calling NewNode")
-	newNode, finish, err := NewNode(el.List[0], tSuite, 2)
+	newNode, finish, err := NewNode(el.List[0], el.List[1].Address, tSuite, 2)
 
 	finish <- true
 
@@ -40,17 +40,17 @@ func TestAddBlock(t *testing.T) {
 	local := onet.NewTCPTest(tSuite)
 	// generate 3 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
-	_, el, _ := local.GenTree(2, false)
+	_, el, _ := local.GenTree(4, false)
 	defer local.CloseAll()
 
 	chain := &Chain{make([]*Block, 1), []byte("testBucket")}
 
-	newNode1, finish1, err := NewNode(el.List[0], tSuite, 0)
+	newNode1, finish1, err := NewNode(el.List[0], el.List[1].Address, tSuite, 0)
 	require.NoError(t, err)
 
 	chain.Blocks[0] = &Block{newNode1.ID, make(map[string]ConfirmedLatency, 0)}
 
-	newNode2, finish2, err := NewNode(el.List[1], tSuite, 1)
+	newNode2, finish2, err := NewNode(el.List[2], el.List[3].Address, tSuite, 1)
 
 	require.NoError(t, err)
 

@@ -40,19 +40,20 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 			wg.Done()
 			return
 		default:
-			log.LLvl1("New array")
-			inputBytes := make([]byte, 4096)
+			inputBytes := make([]byte, 100000)
 			connection.SetReadDeadline(time.Now().Add(5 * time.Millisecond))
 			len, _, err := connection.ReadFrom(inputBytes)
 			if err != nil && !strings.Contains(err.Error(), "i/o timeout") {
 				log.LLvl1(err)
 			}
 			if len > 0 {
+				log.LLvl1("Received message")
 				var msg PingMsg
 				err = protobuf.Decode(inputBytes, &msg)
 				if err != nil {
 					log.LLvl1(err)
 				}
+				log.LLvl1("Received message from " + msg.Src.Address.String())
 				receive <- msg
 			}
 		}
@@ -61,6 +62,7 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 
 //SendMessage lets a server ping another server
 func SendMessage(message PingMsg, srcAddress string, dstAddress string) error {
+	log.LLvl1("Sending message to " + dstAddress)
 	destinationAddress, _ := net.ResolveUDPAddr("udp", dstAddress)
 	sourceAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
 
@@ -72,6 +74,7 @@ func SendMessage(message PingMsg, srcAddress string, dstAddress string) error {
 
 	encoded, err := protobuf.Encode(&message)
 	if err != nil {
+		log.LLvl1(err)
 		return err
 	}
 	connection.Write(encoded)

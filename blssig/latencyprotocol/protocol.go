@@ -1,6 +1,7 @@
 package latencyprotocol
 
 import (
+	"encoding/base64"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
@@ -11,7 +12,7 @@ import (
 const nbLatencies = 5
 
 //NewNode creates a new Node, initializes a new Block for the chain, and gets latencies for it
-func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, nbLatencies int) (*Node, chan bool, error) {
+func NewNode(id *network.ServerIdentity, sendingAddress network.Address, suite *pairing.SuiteBn256, nbLatencies int) (*Node, chan bool, error) {
 
 	log.LLvl1("Creating new node")
 	pubKey, privKey, err := sigAlg.GenerateKey(nil)
@@ -43,8 +44,9 @@ func NewNode(id *network.ServerIdentity, suite *pairing.SuiteBn256, nbLatencies 
 	BlockChannel := make(chan Block, 1)
 
 	newNode := &Node{
-		ID:         nodeID,
-		PrivateKey: privKey,
+		ID:             nodeID,
+		SendingAddress: sendingAddress,
+		PrivateKey:     privKey,
 		//note: this takes a publicKey converted to a string as key
 		LatenciesInConstruction: make(map[string]*LatencyConstructor),
 		BlockSkeleton:           newBlock,
@@ -107,7 +109,6 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 			return
 		default:
 			newMsg := <-Node.IncomingMessageChannel
-			log.LLvl1(newMsg)
 			msgSeqNb := newMsg.SeqNb
 
 			switch msgSeqNb {
@@ -139,10 +140,12 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 				log.LLvl1("Incoming message 5")
 				doubleSignedLatency, messageOkay := Node.checkMessage5(&newMsg)
 				if messageOkay {
-					Node.BlockSkeleton.Latencies[string(newMsg.PublicKey)] = *doubleSignedLatency
+
+					encodedKey := base64.StdEncoding.EncodeToString(newMsg.PublicKey)
+					Node.BlockSkeleton.Latencies[encodedKey] = *doubleSignedLatency //signature content, not whole message
 
 					//get rid of contructor
-					Node.LatenciesInConstruction[string(newMsg.PublicKey)] = nil
+					Node.LatenciesInConstruction[encodedKey] = nil
 					Node.NbLatenciesRefreshed++
 
 					if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock && nbLatenciesForNewBlock > 0 {

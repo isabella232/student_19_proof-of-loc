@@ -15,6 +15,11 @@ type NodeID struct {
 	PublicKey sigAlg.PublicKey
 }
 
+//LatencyWrapper wraps a latency because protobuf needs a struct
+type LatencyWrapper struct {
+	Latency time.Duration
+}
+
 //ConfirmedLatency is a struct that is stored in the block to represent latencies
 type ConfirmedLatency struct {
 	Latency            time.Duration
@@ -31,6 +36,7 @@ type Block struct {
 //Node represents a block in process of being constructed (latencies)
 type Node struct {
 	ID                      *NodeID
+	SendingAddress          network.Address
 	PrivateKey              sigAlg.PrivateKey
 	LatenciesInConstruction map[string]*LatencyConstructor
 	BlockSkeleton           *Block
