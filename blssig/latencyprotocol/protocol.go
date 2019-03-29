@@ -1,7 +1,6 @@
 package latencyprotocol
 
 import (
-	"encoding/base64"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
@@ -131,12 +130,12 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 				}
 			case 4:
 				log.LLvl1("Incoming message 4")
-				msgContent, confirmedLatency, messageOkay := Node.checkMessage4(&newMsg)
+				msgContent, messageOkay := Node.checkMessage4(&newMsg)
 				if messageOkay {
-					Node.sendMessage5(&newMsg, msgContent)
+					confirmedLatency := Node.sendMessage5(&newMsg, msgContent)
 
 					log.LLvl1("Adding new latency to block")
-					encodedKey := base64.StdEncoding.EncodeToString(newMsg.PublicKey)
+					encodedKey := string(newMsg.PublicKey)
 					Node.BlockSkeleton.Latencies[encodedKey] = *confirmedLatency //signature content, not whole message
 
 					//get rid of contructor
@@ -156,7 +155,7 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 				if messageOkay {
 
 					log.LLvl1("Adding new latency to block")
-					encodedKey := base64.StdEncoding.EncodeToString(newMsg.PublicKey)
+					encodedKey := string(newMsg.PublicKey)
 					Node.BlockSkeleton.Latencies[encodedKey] = *doubleSignedLatency
 					//get rid of contructor
 					Node.LatenciesInConstruction[encodedKey] = nil

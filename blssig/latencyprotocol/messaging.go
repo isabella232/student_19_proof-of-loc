@@ -1,7 +1,6 @@
 package latencyprotocol
 
 import (
-	"encoding/base64"
 	"errors"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
@@ -79,7 +78,7 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 		Timestamp: timestamp,
 	}
 
-	encodedKey := base64.StdEncoding.EncodeToString(dstNodeID.PublicKey)
+	encodedKey := string(dstNodeID.PublicKey)
 	_, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
 
 	if alreadyStarted {
@@ -95,6 +94,7 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 		ForeignTimestamps: make([]time.Time, 2),
 		ClockSkews:        make([]time.Duration, 2),
 		Latency:           0,
+		SignedLatency:     nil,
 	}
 
 	latConstr.LocalTimestamps[0] = timestamp
@@ -142,7 +142,7 @@ func (Node *Node) checkMessage1(msg *PingMsg) (*PingMsg1, bool) {
 		return nil, false
 	}
 
-	encodedKey := base64.StdEncoding.EncodeToString(newPubKey)
+	encodedKey := string(newPubKey)
 	_, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
 
 	if alreadyStarted {
@@ -177,9 +177,10 @@ func (Node *Node) sendMessage2(msg *PingMsg, msgContent *PingMsg1) {
 		ForeignTimestamps: make([]time.Time, 2),
 		ClockSkews:        make([]time.Duration, 2),
 		Latency:           0,
+		SignedLatency:     nil,
 	}
 
-	encodedKey := base64.StdEncoding.EncodeToString(msg.PublicKey)
+	encodedKey := string(msg.PublicKey)
 	Node.LatenciesInConstruction[encodedKey] = &latencyConstr
 
 	localtime := time.Now()
@@ -233,7 +234,7 @@ func (Node *Node) checkMessage2(msg *PingMsg) (*PingMsg2, bool) {
 	}
 
 	//check if we are building a latency for this
-	encodedKey := base64.StdEncoding.EncodeToString(senderPubKey)
+	encodedKey := string(senderPubKey)
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
 
 	if !alreadyStarted {
@@ -275,7 +276,7 @@ func (Node *Node) checkMessage2(msg *PingMsg) (*PingMsg2, bool) {
 func (Node *Node) sendMessage3(msg *PingMsg, msgContent *PingMsg2) {
 	log.LLvl1("Sending message 3")
 
-	encodedKey := base64.StdEncoding.EncodeToString(msg.PublicKey)
+	encodedKey := string(msg.PublicKey)
 	latencyConstr := Node.LatenciesInConstruction[encodedKey]
 	latencyConstr.CurrentMsgNb += 2
 
@@ -288,6 +289,7 @@ func (Node *Node) sendMessage3(msg *PingMsg, msgContent *PingMsg2) {
 	latencyConstr.Latency = latency
 	unsignedLatency, err := protobuf.Encode(latency)
 	signedLatency := sigAlg.Sign(Node.PrivateKey, unsignedLatency)
+	latencyConstr.SignedLatency = signedLatency
 
 	msg3Content := &PingMsg3{
 		DstNonce:      msgContent.SrcNonce,
@@ -335,7 +337,7 @@ func (Node *Node) checkMessage3(msg *PingMsg) (*PingMsg3, bool) {
 	}
 
 	//check if we are building a latency for this
-	encodedKey := base64.StdEncoding.EncodeToString(senderPubKey)
+	encodedKey := string(senderPubKey)
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
 
 	if !alreadyStarted {
@@ -373,7 +375,7 @@ func (Node *Node) checkMessage3(msg *PingMsg) (*PingMsg3, bool) {
 func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
 	log.LLvl1("Sending message 4")
 
-	encodedKey := base64.StdEncoding.EncodeToString(msg.PublicKey)
+	encodedKey := string(msg.PublicKey)
 	latencyConstr := Node.LatenciesInConstruction[encodedKey]
 	latencyConstr.CurrentMsgNb += 2
 
@@ -401,6 +403,7 @@ func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
 		return
 	}
 	signedLocalLatency := sigAlg.Sign(Node.PrivateKey, unsignedLocalLatency)
+	latencyConstr.SignedLatency = signedLocalLatency
 
 	signedForeignLatency := SignedForeignLatency{localtime, msgContent.SignedLatency}
 	signedForeignLatencyBytes, err := protobuf.Encode(&signedForeignLatency)
@@ -445,7 +448,7 @@ func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
 
 }
 
-func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, *ConfirmedLatency, bool) {
+func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
 	log.LLvl1("Checking message 4")
 
 	senderPubKey := msg.PublicKey
@@ -453,17 +456,17 @@ func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, *ConfirmedLatency, boo
 	//check signature
 	sigCorrect := sigAlg.Verify(senderPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
-		log.LLvl1("Signature incorrest")
-		return nil, nil, false
+		log.LLvl1("Signature incorrect")
+		return nil, false
 	}
 
 	//check if we are building a latency for this
-	encodedKey := base64.StdEncoding.EncodeToString(msg.PublicKey)
+	encodedKey := string(msg.PublicKey)
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
 
 	if !alreadyStarted {
 		log.LLvl1("Not started yet")
-		return nil, nil, false
+		return nil, false
 	}
 
 	//extract content
@@ -471,7 +474,7 @@ func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, *ConfirmedLatency, boo
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
 		log.LLvl1(err)
-		return nil, nil, false
+		return nil, false
 	}
 
 	sentTimestamp := content.SignedForeignLatency.Timestamp
@@ -480,25 +483,19 @@ func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, *ConfirmedLatency, boo
 	//check freshness
 	if !isFresh(sentTimestamp, freshnessDelta) {
 		log.LLvl1("Not fresh enough")
-		return nil, nil, false
-	}
-
-	newLatency := &ConfirmedLatency{
-		Latency:            latencyConstr.Latency,
-		Timestamp:          sentTimestamp,
-		SignedConfirmation: content.DoubleSignedForeignLatency,
+		return nil, false
 	}
 
 	log.LLvl1("Returning new latency from message 5")
 
-	return &content, newLatency, true
+	return &content, true
 
 }
 
 func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLatency {
 	log.LLvl1("Sending message 5")
 
-	encodedKey := base64.StdEncoding.EncodeToString(msg.PublicKey)
+	encodedKey := string(msg.PublicKey)
 	latencyConstr := Node.LatenciesInConstruction[encodedKey]
 	latencyConstr.CurrentMsgNb += 2
 
@@ -557,6 +554,7 @@ func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLat
 
 	newLatency := &ConfirmedLatency{
 		Latency:            latencyConstr.Latency,
+		SignedLatency:      latencyConstr.SignedLatency,
 		Timestamp:          latencyConstr.ForeignTimestamps[1],
 		SignedConfirmation: msgContent.DoubleSignedForeignLatency,
 	}
@@ -578,7 +576,7 @@ func (Node *Node) checkMessage5(msg *PingMsg) (*ConfirmedLatency, bool) {
 	}
 
 	//check if we are building a latency for this
-	encodedKey := base64.StdEncoding.EncodeToString(msg.PublicKey)
+	encodedKey := string(msg.PublicKey)
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
 
 	if !alreadyStarted {

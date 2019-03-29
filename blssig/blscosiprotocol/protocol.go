@@ -8,6 +8,7 @@ import (
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/protobuf"
+	sigAlg "golang.org/x/crypto/ed25519"
 	"time"
 )
 
@@ -45,16 +46,46 @@ func NewLatencyVerificatingProtocol(n *onet.TreeNodeInstance) (onet.ProtocolInst
 			return err
 		}
 
-		//check latencies -> 20 < x < 300 ms
-		for _, latency := range block.Latencies {
-			if latency.Latency < 20*time.Millisecond {
-				return errors.New("Latency too short")
-			}
-			if latency.Latency > 300*time.Millisecond {
+		for pubKey, latency := range block.Latencies {
+
+			//check latency not too long
+			if latency.Latency > 500*time.Millisecond {
 				return errors.New("Latency too long")
 			}
-		}
 
+			// check timestamp freshness
+			if time.Now().Sub(latency.Timestamp) < 60*time.Second {
+				return errors.New("Timestamp too old")
+			}
+
+			//check signatures
+			expectedContent := latencyprotocol.SignedForeignLatency{
+				Timestamp:     latency.Timestamp,
+				SignedLatency: latency.SignedLatency}
+
+			encodedExpectedContent, err := protobuf.Encode(&expectedContent)
+			if err != nil {
+				log.LLvl1(err)
+				return err
+			}
+
+			sigCorrect := sigAlg.Verify([]byte(pubKey), encodedExpectedContent, latency.SignedConfirmation)
+			if !sigCorrect {
+				return errors.New("Incorrect foreign signature")
+			}
+
+			encodedLat, err := protobuf.Encode(&latency.Latency)
+			if err != nil {
+				log.LLvl1(err)
+				return err
+			}
+
+			localSigCorrect := sigAlg.Verify(block.ID.PublicKey, encodedLat, latency.SignedLatency)
+			if !localSigCorrect {
+				return errors.New("Incorrect local signature")
+			}
+
+		}
 		return nil
 
 	}

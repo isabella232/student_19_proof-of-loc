@@ -56,6 +56,7 @@ func initChain(N int, x int, src sourceType) *Chain {
 				case random:
 					latencies[string(nodeIDs[j].PublicKey)] = ConfirmedLatency{
 						time.Duration((rand.Intn(300-20) + 20)),
+						nil,
 						time.Now(),
 						nil,
 					}
@@ -63,18 +64,21 @@ func initChain(N int, x int, src sourceType) *Chain {
 					latencies[string(nodeIDs[j].PublicKey)] =
 						ConfirmedLatency{
 							time.Duration(10 * (i + j + 1)),
+							nil,
 							time.Now(),
 							nil,
 						}
 				case variant:
 					latencies[string(nodeIDs[j].PublicKey)] = ConfirmedLatency{
 						time.Duration(10 * (i + j + 1 + rand.Intn(5))),
+						nil,
 						time.Now(),
 						nil,
 					}
 				case inaccurate:
 					latencies[string(nodeIDs[j].PublicKey)] = ConfirmedLatency{
 						time.Duration(((i * 10000) + j + 1)),
+						nil,
 						time.Now(),
 						nil,
 					}

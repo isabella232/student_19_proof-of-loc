@@ -23,6 +23,7 @@ type LatencyWrapper struct {
 //ConfirmedLatency is a struct that is stored in the block to represent latencies
 type ConfirmedLatency struct {
 	Latency            time.Duration
+	SignedLatency      []byte
 	Timestamp          time.Time
 	SignedConfirmation []byte
 }
@@ -61,4 +62,5 @@ type LatencyConstructor struct {
 	ForeignTimestamps []time.Time
 	ClockSkews        []time.Duration
 	Latency           time.Duration
+	SignedLatency     []byte
 }
