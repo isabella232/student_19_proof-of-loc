@@ -24,13 +24,16 @@ type PropagationFunction struct {
 
 //CreateNodeRequest is what the BLSCosi service is expected to receive from clients to create a new block
 type CreateNodeRequest struct {
-	Roster *onet.Roster
-	ID     *network.ServerIdentity
+	Roster                    *onet.Roster
+	ID                        *network.ServerIdentity
+	sendingAddress            network.Address
+	nbLatenciesNeededForBlock int
 }
 
 //CreateNodeResponse is what a BLSCosi service replies to clients trying to create blocks
 type CreateNodeResponse struct {
-	Node []byte
+	stopChannel chan bool
+	Node        []byte
 }
 
 //CreateBlockRequest is what the BLSCosi service is expected to receive from clients to add Blocks to a chain

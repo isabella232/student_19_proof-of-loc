@@ -79,37 +79,3 @@ func (c *Client) ProposeNewNode(id *network.ServerIdentity, roster *onet.Roster)
 
 	return &newNode, nil
 }
-
-func (c *Client) triggerBlockCreationOnNode(Node *latencyprotocol.Node, roster *onet.Roster) (*latencyprotocol.Block, error) {
-
-	if len(roster.List) == 0 {
-		return nil, errors.New("Got an empty roster-list")
-	}
-
-	dst := roster.List[0]
-
-	nodeBytes, err := protobuf.Encode(Node)
-	if err != nil {
-		return nil, err
-	}
-	newBlockRequest := &CreateBlockRequest{
-		Roster: roster,
-		Node:   nodeBytes,
-	}
-
-	log.Lvl1("Sending node creation request message to", dst)
-	createBlockReply := &CreateBlockResponse{}
-	err = c.SendProtobuf(dst, newBlockRequest, createBlockReply)
-	if err != nil {
-		return nil, err
-	}
-
-	newBlock := &latencyprotocol.Block{}
-	err = protobuf.Decode(createBlockReply.Block, newBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	return newBlock, nil
-
-}
