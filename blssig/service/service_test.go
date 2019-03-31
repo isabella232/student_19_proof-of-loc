@@ -3,11 +3,13 @@ package service
 import (
 	"testing"
 
+	"github.com/dedis/student_19_proof-of-loc/blssig/latencyprotocol"
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
+	"go.dedis.ch/protobuf"
 )
 
 const blocksName = "testBlocks"
@@ -91,7 +93,40 @@ func TestSignatureRequestApi(t *testing.T) {
 	require.Nil(t, err, "Propagation incorrect")
 }
 
-/*func TestNewNodeApi(t *testing.T) {
+func TestNewNodeService(t *testing.T) {
+
+	local := onet.NewTCPTest(tSuite)
+	// generate 3 hosts, they don't connect, they process messages, and they
+	// don't register the tree or entitylist
+	hosts, el, _ := local.GenTree(3, false)
+	_, elNew, _ := local.GenTree(2, false)
+	defer local.CloseAll()
+
+	services := local.GetServices(hosts, serviceID)
+	s := services[0].(*BLSCoSiService)
+
+	roster := &onet.Roster{List: el.List}
+
+	createNodeRequest := &CreateNodeRequest{
+		Roster:                    roster,
+		ID:                        elNew.List[0],
+		sendingAddress:            elNew.List[1].Address,
+		nbLatenciesNeededForBlock: 1,
+	}
+
+	response, err := s.CreateNode(createNodeRequest)
+
+	require.NoError(t, err)
+
+	newNode := latencyprotocol.Node{}
+	err = protobuf.Decode(response.Node, &newNode)
+
+	require.NoError(t, err)
+	require.Equal(t, newNode.ID.ServerID, elNew.List[0])
+
+}
+
+func TestNewNodeApi(t *testing.T) {
 
 	log.SetDebugVisible(1)
 
@@ -113,4 +148,4 @@ func TestSignatureRequestApi(t *testing.T) {
 
 	require.NoError(t, err)
 
-}*/
+}

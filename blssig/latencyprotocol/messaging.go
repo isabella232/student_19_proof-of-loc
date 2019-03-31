@@ -621,7 +621,3 @@ func (Node *Node) checkMessage5(msg *PingMsg) (*ConfirmedLatency, bool) {
 func isFresh(timestamp time.Time, delta time.Duration) bool {
 	return timestamp.After(time.Now().Add(-delta))
 }
-
-func acceptableDifference(time1 time.Duration, time2 time.Duration, delta time.Duration) bool {
-	return time1-time2 < delta && time2-time1 < delta
-}

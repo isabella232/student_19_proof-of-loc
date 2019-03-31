@@ -114,6 +114,8 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 				log.LLvl1("Incoming message 1")
 				msgContent, messageOkay := Node.checkMessage1(&newMsg)
 				if messageOkay {
+					Node.BlockSkeleton.ID = &NodeID{&newMsg.Src, newMsg.PublicKey}
+					// TODO what if multiple latencies try to connect to node at same time -> Node needs list of blocks in construction
 					Node.sendMessage2(&newMsg, msgContent)
 				}
 			case 2:

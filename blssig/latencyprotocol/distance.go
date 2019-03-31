@@ -2,6 +2,7 @@ package latencyprotocol
 
 import (
 	"errors"
+	sigAlg "golang.org/x/crypto/ed25519"
 	"strconv"
 	"time"
 )
@@ -215,4 +216,74 @@ func (chain *Chain) ApproximateOverChain(B *Node, C *Node) (time.Duration, error
 
 	return averageDistance / time.Duration(len(collectedDistances)), nil
 
+}
+
+type nodeTuple struct {
+	A *sigAlg.PublicKey
+	B *sigAlg.PublicKey
+}
+
+//CreateBlacklist iterates through a chain and for each block checks if the latencies qiven by its node make sense
+// If they do not, the node is added to a blacklist of nodes not to be trusted
+//Warning: for now, this function assumes that all nodes give latencies to all other nodes
+func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int) ([]sigAlg.PublicKey, error) {
+
+	idConstructor := make(map[string]*NodeID)
+	blockMapper := make(map[string]*Block)
+	suspicious := make(map[string]int)
+
+	for _, block := range chain.Blocks {
+		blockMapper[string(block.ID.PublicKey)] = block
+	}
+
+	ABlock := blockMapper[string(A.ID.PublicKey)]
+
+	//for each node B
+	//for each node C
+	/* Check A -> B, A -> C, B -> C and C -> B
+	* if triangle of lengths does not result in realistic angles (rule of 3 for triangles),
+	either B or C needs to be blacklisted -> add (B,C) to a "suspicious" list and keep checking B
+	*/
+
+	for _, BBlock := range chain.Blocks {
+		B := BBlock.ID
+		idConstructor[string(B.PublicKey)] = B
+		for Cstring, BtoCSigned := range BBlock.Latencies {
+			BtoC := BtoCSigned.Latency
+			CBlock := blockMapper[string(Cstring)]
+
+			AtoB, _ := ABlock.getLatency(BBlock)
+			AtoC, _ := ABlock.getLatency(CBlock)
+			CtoB, _ := CBlock.getLatency(BBlock)
+
+			if !acceptableDifference(CtoB, BtoC, delta) || !triangleInequality(AtoB, AtoC, BtoC) {
+				suspicious[string(B.PublicKey)]++
+				suspicious[string(CBlock.ID.PublicKey)]++
+			}
+
+		}
+
+	}
+
+	// At the end, go through the "suspicious" list and count the occurrences of each node
+	//if a given node appears too often, blacklist it
+	blacklist := make([]sigAlg.PublicKey, 0)
+
+	for keyString, nbSuspiciousRelations := range suspicious {
+		if nbSuspiciousRelations > threshold {
+			blacklist = append(blacklist, sigAlg.PublicKey([]byte(keyString)))
+		}
+	}
+
+	return blacklist, nil
+
+}
+
+// a+b>c, a+c>b, b+c > a
+func triangleInequality(latAB time.Duration, latBC time.Duration, latCA time.Duration) bool {
+	return latAB+latBC > latCA && latAB+latCA > latBC && latBC+latCA > latAB
+}
+
+func acceptableDifference(time1 time.Duration, time2 time.Duration, delta time.Duration) bool {
+	return time1-time2 < delta && time2-time1 < delta
 }
