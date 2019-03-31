@@ -32,8 +32,7 @@ type CreateNodeRequest struct {
 
 //CreateNodeResponse is what a BLSCosi service replies to clients trying to create blocks
 type CreateNodeResponse struct {
-	stopChannel chan bool
-	Node        []byte
+	created bool
 }
 
 //CreateBlockRequest is what the BLSCosi service is expected to receive from clients to add Blocks to a chain

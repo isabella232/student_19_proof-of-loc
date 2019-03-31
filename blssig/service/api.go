@@ -2,12 +2,10 @@ package service
 
 import (
 	"errors"
-	"github.com/dedis/student_19_proof-of-loc/blssig/latencyprotocol"
 	"go.dedis.ch/cothority/v3"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
-	"go.dedis.ch/protobuf"
 )
 
 const nbPingsNeeded = 5
@@ -51,10 +49,10 @@ signed by a majority, and then distributes it to other nodes. For now, nodes can
 but later we might add a “work” function, either computing a hash preimage like in Bitcoin or smth else.
 
 */
-func (c *Client) ProposeNewNode(id *network.ServerIdentity, roster *onet.Roster) (*latencyprotocol.Node, error) {
+func (c *Client) ProposeNewNode(id *network.ServerIdentity, roster *onet.Roster) error {
 
 	if len(roster.List) == 0 {
-		return nil, errors.New("Got an empty roster-list")
+		return errors.New("Got an empty roster-list")
 	}
 
 	dst := roster.List[0]
@@ -68,14 +66,8 @@ func (c *Client) ProposeNewNode(id *network.ServerIdentity, roster *onet.Roster)
 	createNodeReply := &CreateNodeResponse{}
 	err := c.SendProtobuf(dst, newNodeRequest, createNodeReply)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	newNode := latencyprotocol.Node{}
-	err = protobuf.Decode(createNodeReply.Node, &newNode)
-	if err != nil {
-		return nil, err
-	}
-
-	return &newNode, nil
+	return nil
 }

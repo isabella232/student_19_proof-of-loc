@@ -11,7 +11,7 @@ import (
 )
 
 //InitListening allows the start of listening for pings on the server
-func InitListening(srcAddress string, finish <-chan bool, ready chan<- bool, wg *sync.WaitGroup) <-chan PingMsg {
+func InitListening(srcAddress string, finish <-chan bool, ready chan<- bool, wg *sync.WaitGroup) chan PingMsg {
 	log.LLvl1("Init UDP listening on " + srcAddress)
 	receive := make(chan PingMsg, 100)
 	wg.Add(1)

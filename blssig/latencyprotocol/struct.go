@@ -42,7 +42,7 @@ type Node struct {
 	LatenciesInConstruction map[string]*LatencyConstructor
 	BlockSkeleton           *Block
 	NbLatenciesRefreshed    int
-	IncomingMessageChannel  <-chan PingMsg
+	IncomingMessageChannel  chan PingMsg
 	BlockChannel            chan Block
 }
 

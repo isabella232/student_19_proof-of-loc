@@ -37,6 +37,7 @@ type BLSCoSiService struct {
 	Chain               *latencyprotocol.Chain
 	Suite               *pairing.SuiteBn256
 	Nodes               []*latencyprotocol.Node
+	ShutdownChannels    map[string]chan bool
 }
 
 func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
@@ -44,6 +45,8 @@ func newBLSCoSiService(c *onet.Context) (onet.Service, error) {
 		ServiceProcessor: onet.NewServiceProcessor(c),
 		Chain:            &latencyprotocol.Chain{Blocks: make([]*latencyprotocol.Block, 0), BucketName: []byte("latencyprotocolBlocks")},
 		Suite:            pairing.NewSuiteBn256(),
+		Nodes:            make([]*latencyprotocol.Node, 0),
+		ShutdownChannels: make(map[string]chan bool),
 	}
 
 	err := s.RegisterHandler(s.SignatureRequest)
@@ -150,25 +153,27 @@ func (s *BLSCoSiService) CreateNode(request *CreateNodeRequest) (*CreateNodeResp
 		return nil, err
 	}
 
-	s.Nodes = append(s.Nodes, newNode)
-
-	nodeBytes, err := protobuf.Encode(newNode)
-
-	if err != nil {
-		if shutdownChannel != nil {
-			shutdownChannel <- true
-		}
-		return nil, err
-	}
-
 	var wg sync.WaitGroup
 	stopListeningForNewBlockChannel := make(chan bool, 1)
+
+	s.Nodes = append(s.Nodes, newNode)
+	s.ShutdownChannels[string(newNode.ID.PublicKey)] = stopListeningForNewBlockChannel
 
 	wg.Add(1)
 	go s.listenForNewBlocks(*newNode, stopListeningForNewBlockChannel, shutdownChannel, request.Roster, &wg)
 
-	return &CreateNodeResponse{stopListeningForNewBlockChannel, nodeBytes}, nil
+	return &CreateNodeResponse{true}, nil
 
+}
+
+func (s *BLSCoSiService) shutdownAllNodes() error {
+	log.LLvl1("Shutting down all nodes")
+	for _, node := range s.Nodes {
+		s.ShutdownChannels[string(node.ID.PublicKey)] <- true
+	}
+	s.Nodes = make([]*latencyprotocol.Node, 0)
+	s.ShutdownChannels = make(map[string]chan bool)
+	return nil
 }
 
 func (s *BLSCoSiService) listenForNewBlocks(node latencyprotocol.Node, stopListeningIncoming chan bool, stopListeningOutgoing chan bool,
