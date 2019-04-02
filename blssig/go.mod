@@ -9,5 +9,6 @@ require (
 	go.dedis.ch/protobuf v1.0.6
 	go.etcd.io/bbolt v1.3.0
 	golang.org/x/crypto v0.0.0-20190123085648-057139ce5d2b
+	golang.org/x/net v0.0.0-20190125091013-d26f9f9a57f3
 	gopkg.in/satori/go.uuid.v1 v1.2.0
 )

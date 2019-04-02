@@ -65,9 +65,9 @@ func TestAddBlock(t *testing.T) {
 
 	block2 := <-newNode2.BlockChannel
 
-	finish2 <- true
-
 	log.LLvl1("Channel 2 got its block")
+
+	finish2 <- true
 
 	require.NotNil(t, block1)
 	require.NotNil(t, block2)
