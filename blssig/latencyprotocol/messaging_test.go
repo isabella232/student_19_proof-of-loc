@@ -3,6 +3,7 @@ package latencyprotocol
 import (
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/onet/v3"
+	"go.dedis.ch/onet/v3/log"
 	"testing"
 	"time"
 )
@@ -17,7 +18,7 @@ func constructBlocks() ([]*Node, *Chain, error) {
 	_, el, _ := local.GenTree(4, false)
 	defer local.CloseAll()
 
-	chain := &Chain{make([]*Block, 3), []byte("testBucket")}
+	chain := &Chain{make([]*Block, 1), []byte("testBucket")}
 
 	newNode1, finish1, err := NewNode(el.List[0], el.List[1].Address, tSuite, 1)
 	if err != nil {
@@ -34,14 +35,22 @@ func constructBlocks() ([]*Node, *Chain, error) {
 	newNode2.AddBlock(chain)
 
 	block1 := <-newNode1.BlockChannel
-	block2 := <-newNode2.BlockChannel
+
+	log.LLvl1("Channel 1 got its block")
 
 	finish1 <- true
+
+	block2 := <-newNode2.BlockChannel
+
+	log.LLvl1("Channel 2 got its block")
+
 	finish2 <- true
 
-	chain.Blocks[1] = &block1
-	chain.Blocks[2] = &block2
+	log.LLvl1("Storing blocks")
+	chain.Blocks = append(chain.Blocks, &block1)
+	chain.Blocks = append(chain.Blocks, &block2)
 
+	log.LLvl1("Storing nodes")
 	nodes := make([]*Node, 2)
 	nodes[0] = newNode1
 	nodes[1] = newNode2
@@ -52,6 +61,7 @@ func constructBlocks() ([]*Node, *Chain, error) {
 
 func TestCompareLatenciesToPings(t *testing.T) {
 
+	log.LLvl1("Make chain")
 	nodes, chain, err := constructBlocks()
 
 	require.NoError(t, err)

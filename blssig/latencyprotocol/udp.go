@@ -77,6 +77,7 @@ func SendMessage(message PingMsg, srcAddress string, dstAddress string) error {
 		log.LLvl1(err)
 		return err
 	}
+	log.LLvl1("Writing message to channel")
 	connection.Write(encoded)
 	return nil
 }
