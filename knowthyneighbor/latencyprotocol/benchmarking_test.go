@@ -118,7 +118,7 @@ func InterAddressPing(srcAddress1 string, dstAddress1 string, srcAddress2 string
 	wg1.Wait()
 	wg2.Wait()
 
-	return endTime1.Sub(startTime1), endTime2.Sub(startTime2), nil
+	return 2 * endTime1.Sub(startTime1), 2 * endTime2.Sub(startTime2), nil
 
 }
 
