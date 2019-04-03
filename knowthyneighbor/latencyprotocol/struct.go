@@ -1,6 +1,7 @@
 package latencyprotocol
 
 import (
+	"github.com/dedis/student_19_proof-of-loc/blssig/udp"
 	"go.dedis.ch/onet/v3/network"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"time"
@@ -42,7 +43,7 @@ type Node struct {
 	LatenciesInConstruction map[string]*LatencyConstructor
 	BlockSkeleton           *Block
 	NbLatenciesRefreshed    int
-	IncomingMessageChannel  chan PingMsg
+	IncomingMessageChannel  chan udp.PingMsg
 	BlockChannel            chan Block
 }
 

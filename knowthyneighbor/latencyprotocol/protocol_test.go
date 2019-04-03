@@ -69,26 +69,26 @@ func TestAddBlock(t *testing.T) {
 
 	finish2 <- true
 
-	require.NotNil(t, block1)
-	require.NotNil(t, block2)
+	require.NotNil(t, block1, "Nil block")
+	require.NotNil(t, block2, "Nil block")
 
-	require.Equal(t, newNode1.ID, block1.ID)
-	require.Equal(t, newNode2.ID, block2.ID)
+	require.Equal(t, newNode1.ID, block1.ID, "Wrong id")
+	require.Equal(t, newNode2.ID, block2.ID, "Wrong id")
 
-	require.Len(t, block1.Latencies, 1)
-	require.Equal(t, 1, len(block2.Latencies))
-	require.Contains(t, block1.Latencies, string(block2.ID.PublicKey))
-	require.Contains(t, block2.Latencies, string(block1.ID.PublicKey))
+	require.Len(t, block1.Latencies, 1, "Wrong number of latencies")
+	require.Equal(t, 1, len(block2.Latencies), "Wrong number of latencies")
+	require.Contains(t, block1.Latencies, string(block2.ID.PublicKey), "latency missing")
+	require.Contains(t, block2.Latencies, string(block1.ID.PublicKey), "latency missing")
 
 	latency1 := block1.Latencies[string(block2.ID.PublicKey)].Latency
 	latency2 := block2.Latencies[string(block1.ID.PublicKey)].Latency
 
-	require.NotZero(t, latency1)
-	require.NotZero(t, latency2)
+	require.NotZero(t, latency1, "Zero latency")
+	require.NotZero(t, latency2, "Zero latency")
 
-	latencyDiff := latency1 - latency2
+	latencyDiff1 := latency1 - latency2
+	latencyDiff2 := latency2 - latency1
 
-	require.True(t, (latencyDiff < 10*time.Millisecond))
-	require.True(t, (latencyDiff > 0*time.Millisecond))
+	require.True(t, (latencyDiff1 < 10*time.Millisecond) || (latencyDiff2 < 10*time.Millisecond), "latency differencetoo long")
 
 }

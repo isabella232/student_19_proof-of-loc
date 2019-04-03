@@ -1,6 +1,7 @@
 package latencyprotocol
 
 import (
+	"github.com/dedis/student_19_proof-of-loc/blssig/udp"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
@@ -36,7 +37,7 @@ func NewNode(id *network.ServerIdentity, sendingAddress network.Address, suite *
 	wg.Add(1)
 	go passOnEndSignal(finish, finishHandling, finishListening, &wg)
 
-	receiverChannel := InitListening(id.Address.NetworkAddress(), finishListening, udpReady, &wg)
+	receiverChannel := udp.InitListening(id.Address.NetworkAddress(), finishListening, udpReady, &wg)
 
 	<-udpReady
 

@@ -2,8 +2,8 @@ package latencyprotocol
 
 import (
 	"errors"
+	"github.com/dedis/student_19_proof-of-loc/blssig/udp"
 	"go.dedis.ch/onet/v3/log"
-	"go.dedis.ch/onet/v3/network"
 	"go.dedis.ch/protobuf"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"math"
@@ -14,17 +14,6 @@ import (
 
 const freshnessDelta = 10 * time.Second
 const intervallDelta = 10 * time.Second
-
-//PingMsg represents a message sent to another validator
-type PingMsg struct {
-	Src       network.ServerIdentity
-	Dst       network.ServerIdentity
-	SeqNb     int
-	PublicKey sigAlg.PublicKey
-
-	UnsignedContent []byte
-	SignedContent   []byte
-}
 
 //PingMsg1 represents the content of the latency protocol's first message
 type PingMsg1 struct {
@@ -108,7 +97,7 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 
 	signed := sigAlg.Sign(Node.PrivateKey, unsigned)
 
-	msg := PingMsg{
+	msg := udp.PingMsg{
 		Src:       *Node.ID.ServerID,
 		Dst:       *dstNodeID.ServerID,
 		SeqNb:     1,
@@ -123,7 +112,7 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 
 	log.LLvl1("Sending message 1 from " + srcAddress + " to " + dstAddress)
 
-	err = SendMessage(msg, srcAddress, dstAddress)
+	err = udp.SendMessage(msg, srcAddress, dstAddress)
 	if err != nil {
 		return err
 	}
@@ -132,7 +121,7 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 
 }
 
-func (Node *Node) checkMessage1(msg *PingMsg) (*PingMsg1, bool) {
+func (Node *Node) checkMessage1(msg *udp.PingMsg) (*PingMsg1, bool) {
 	log.LLvl1("Checking message 1")
 
 	newPubKey := msg.PublicKey
@@ -163,7 +152,7 @@ func (Node *Node) checkMessage1(msg *PingMsg) (*PingMsg1, bool) {
 
 }
 
-func (Node *Node) sendMessage2(msg *PingMsg, msgContent *PingMsg1) {
+func (Node *Node) sendMessage2(msg *udp.PingMsg, msgContent *PingMsg1) {
 	log.LLvl1("Sending message 2")
 
 	nonce := Nonce(rand.Intn(math.MaxInt32))
@@ -202,7 +191,7 @@ func (Node *Node) sendMessage2(msg *PingMsg, msgContent *PingMsg1) {
 
 	signed := sigAlg.Sign(Node.PrivateKey, unsigned)
 
-	newMsg := PingMsg{
+	newMsg := udp.PingMsg{
 		Src:       msg.Dst,
 		Dst:       msg.Src,
 		SeqNb:     2,
@@ -217,11 +206,11 @@ func (Node *Node) sendMessage2(msg *PingMsg, msgContent *PingMsg1) {
 
 	log.LLvl1("Sending message 2 from " + srcAddress + " to " + dstAddress)
 
-	SendMessage(newMsg, srcAddress, dstAddress)
+	udp.SendMessage(newMsg, srcAddress, dstAddress)
 
 }
 
-func (Node *Node) checkMessage2(msg *PingMsg) (*PingMsg2, bool) {
+func (Node *Node) checkMessage2(msg *udp.PingMsg) (*PingMsg2, bool) {
 	log.LLvl1("Checking message 2")
 
 	senderPubKey := msg.PublicKey
@@ -273,7 +262,7 @@ func (Node *Node) checkMessage2(msg *PingMsg) (*PingMsg2, bool) {
 
 }
 
-func (Node *Node) sendMessage3(msg *PingMsg, msgContent *PingMsg2) {
+func (Node *Node) sendMessage3(msg *udp.PingMsg, msgContent *PingMsg2) {
 	log.LLvl1("Sending message 3")
 
 	encodedKey := string(msg.PublicKey)
@@ -305,7 +294,7 @@ func (Node *Node) sendMessage3(msg *PingMsg, msgContent *PingMsg2) {
 
 	signedContent := sigAlg.Sign(Node.PrivateKey, unsignedContent)
 
-	newMsg := PingMsg{
+	newMsg := udp.PingMsg{
 		Src:             msg.Dst,
 		Dst:             msg.Src,
 		SeqNb:           3,
@@ -319,11 +308,11 @@ func (Node *Node) sendMessage3(msg *PingMsg, msgContent *PingMsg2) {
 
 	log.LLvl1("Sending message 3 from " + srcAddress + " to " + dstAddress)
 
-	SendMessage(newMsg, srcAddress, dstAddress)
+	udp.SendMessage(newMsg, srcAddress, dstAddress)
 
 }
 
-func (Node *Node) checkMessage3(msg *PingMsg) (*PingMsg3, bool) {
+func (Node *Node) checkMessage3(msg *udp.PingMsg) (*PingMsg3, bool) {
 
 	log.LLvl1("Checking message 3")
 
@@ -372,7 +361,7 @@ func (Node *Node) checkMessage3(msg *PingMsg) (*PingMsg3, bool) {
 
 }
 
-func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
+func (Node *Node) sendMessage4(msg *udp.PingMsg, msgContent *PingMsg3) {
 	log.LLvl1("Sending message 4")
 
 	encodedKey := string(msg.PublicKey)
@@ -429,7 +418,7 @@ func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
 
 	signedContent := sigAlg.Sign(Node.PrivateKey, unsignedContent)
 
-	newMsg := PingMsg{
+	newMsg := udp.PingMsg{
 		Src:       msg.Dst,
 		Dst:       msg.Src,
 		SeqNb:     4,
@@ -444,11 +433,11 @@ func (Node *Node) sendMessage4(msg *PingMsg, msgContent *PingMsg3) {
 
 	log.LLvl1("Sending message 4 from " + srcAddress + " to " + dstAddress)
 
-	SendMessage(newMsg, srcAddress, dstAddress)
+	udp.SendMessage(newMsg, srcAddress, dstAddress)
 
 }
 
-func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
+func (Node *Node) checkMessage4(msg *udp.PingMsg) (*PingMsg4, bool) {
 	log.LLvl1("Checking message 4")
 
 	senderPubKey := msg.PublicKey
@@ -492,7 +481,7 @@ func (Node *Node) checkMessage4(msg *PingMsg) (*PingMsg4, bool) {
 
 }
 
-func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLatency {
+func (Node *Node) sendMessage5(msg *udp.PingMsg, msgContent *PingMsg4) *ConfirmedLatency {
 	log.LLvl1("Sending message 5")
 
 	encodedKey := string(msg.PublicKey)
@@ -535,7 +524,7 @@ func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLat
 
 	signedContent := sigAlg.Sign(Node.PrivateKey, unsignedContent)
 
-	newMsg := PingMsg{
+	newMsg := udp.PingMsg{
 		Src:       msg.Dst,
 		Dst:       msg.Src,
 		SeqNb:     5,
@@ -550,7 +539,7 @@ func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLat
 
 	log.LLvl1("Sending message 5 from " + srcAddress + " to " + dstAddress)
 
-	SendMessage(newMsg, srcAddress, dstAddress)
+	udp.SendMessage(newMsg, srcAddress, dstAddress)
 
 	newLatency := &ConfirmedLatency{
 		Latency:            latencyConstr.Latency,
@@ -563,7 +552,7 @@ func (Node *Node) sendMessage5(msg *PingMsg, msgContent *PingMsg4) *ConfirmedLat
 
 }
 
-func (Node *Node) checkMessage5(msg *PingMsg) (*ConfirmedLatency, bool) {
+func (Node *Node) checkMessage5(msg *udp.PingMsg) (*ConfirmedLatency, bool) {
 	log.LLvl1("Checking message 5")
 
 	senderPubKey := msg.PublicKey

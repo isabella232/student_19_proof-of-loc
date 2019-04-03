@@ -1,13 +1,16 @@
-package latencyprotocol
+package udp
 
 import (
 	"github.com/stretchr/testify/require"
+	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"sync"
 	"testing"
 )
+
+var tSuite = pairing.NewSuiteBn256()
 
 func TestListeningInit(t *testing.T) {
 	var wg sync.WaitGroup

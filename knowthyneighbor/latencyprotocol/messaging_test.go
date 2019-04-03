@@ -2,6 +2,7 @@ package latencyprotocol
 
 import (
 	"errors"
+	"github.com/dedis/student_19_proof-of-loc/blssig/udp"
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
@@ -81,17 +82,17 @@ func InterAddressPing(srcAddress1 string, dstAddress1 string, srcAddress2 string
 	finishListeningChannel2 := make(chan bool, 1)
 	readyToListenChannel2 := make(chan bool, 1)
 
-	msgChannel1 := InitListening(dstAddress1, finishListeningChannel1, readyToListenChannel1, &wg1)
-	msgChannel2 := InitListening(dstAddress2, finishListeningChannel2, readyToListenChannel2, &wg2)
+	msgChannel1 := udp.InitListening(dstAddress1, finishListeningChannel1, readyToListenChannel1, &wg1)
+	msgChannel2 := udp.InitListening(dstAddress2, finishListeningChannel2, readyToListenChannel2, &wg2)
 
 	<-readyToListenChannel1
 	<-readyToListenChannel2
 
-	msg1 := PingMsg{}
-	msg2 := PingMsg{}
+	msg1 := udp.PingMsg{}
+	msg2 := udp.PingMsg{}
 
 	startTime1 := time.Now()
-	err := SendMessage(msg1, srcAddress1, dstAddress1)
+	err := udp.SendMessage(msg1, srcAddress1, dstAddress1)
 	if err != nil {
 		finishListeningChannel1 <- true
 		finishListeningChannel2 <- true
@@ -102,7 +103,7 @@ func InterAddressPing(srcAddress1 string, dstAddress1 string, srcAddress2 string
 	endTime1 := time.Now()
 
 	startTime2 := time.Now()
-	err = SendMessage(msg2, srcAddress2, dstAddress2)
+	err = udp.SendMessage(msg2, srcAddress2, dstAddress2)
 	if err != nil {
 		finishListeningChannel1 <- true
 		finishListeningChannel2 <- true

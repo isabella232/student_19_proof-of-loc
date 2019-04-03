@@ -1,14 +1,27 @@
-package latencyprotocol
+package udp
 
 // sources: https://holwech.github.io/blog/Creating-a-simple-UDP-module/
 import (
 	"go.dedis.ch/onet/v3/log"
+	"go.dedis.ch/onet/v3/network"
 	"go.dedis.ch/protobuf"
+	sigAlg "golang.org/x/crypto/ed25519"
 	"net"
 	"strings"
 	"sync"
 	"time"
 )
+
+//PingMsg represents a message sent to another validator
+type PingMsg struct {
+	Src       network.ServerIdentity
+	Dst       network.ServerIdentity
+	SeqNb     int
+	PublicKey sigAlg.PublicKey
+
+	UnsignedContent []byte
+	SignedContent   []byte
+}
 
 //InitListening allows the start of listening for pings on the server
 func InitListening(srcAddress string, finish <-chan bool, ready chan<- bool, wg *sync.WaitGroup) chan PingMsg {
