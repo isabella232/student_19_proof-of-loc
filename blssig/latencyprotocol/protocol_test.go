@@ -83,8 +83,12 @@ func TestAddBlock(t *testing.T) {
 	latency1 := block1.Latencies[string(block2.ID.PublicKey)].Latency
 	latency2 := block2.Latencies[string(block1.ID.PublicKey)].Latency
 
+	require.NotZero(t, latency1)
+	require.NotZero(t, latency2)
+
 	latencyDiff := latency1 - latency2
 
 	require.True(t, (latencyDiff < 10*time.Millisecond))
+	require.True(t, (latencyDiff > 0*time.Millisecond))
 
 }

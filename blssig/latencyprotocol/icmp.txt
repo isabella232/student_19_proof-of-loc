@@ -6,14 +6,14 @@ package latencyprotocol
 
 import (
 	"errors"
-	"log"
+	"go.dedis.ch/onet/v3/log"
 	"net"
 	"os"
 	"runtime"
 	"time"
 
 	"golang.org/x/net/icmp"
-	"golang.org/x/net/ipv6"
+	"golang.org/x/net/ipv4"
 )
 
 //Ping uses ICMP to ping an IP address
@@ -21,20 +21,21 @@ func Ping(srcAddress string, dstAddress string) (time.Duration, error) {
 	switch runtime.GOOS {
 	case "darwin":
 	case "linux":
-		log.Println("you may need to adjust the net.ipv4.ping_group_range kernel state")
+		log.LLvl1("you may need to adjust the net.ipv4.ping_group_range kernel state")
 	default:
-		log.Println("not supported on", runtime.GOOS)
+		log.LLvl1("not supported on", runtime.GOOS)
 		return 0, errors.New("not supported on " + runtime.GOOS)
 	}
 
-	c, err := icmp.ListenPacket("udp6", srcAddress)
+	c, err := icmp.ListenPacket("udp4", srcAddress)
 	if err != nil {
+		log.LLvl1("Problem listening for icmp packets")
 		return 0, err
 	}
 	defer c.Close()
 
 	wm := icmp.Message{
-		Type: ipv6.ICMPTypeEchoRequest, Code: 0,
+		Type: ipv4.ICMPTypeExtendedEchoRequest, Code: 0,
 		Body: &icmp.Echo{
 			ID: os.Getpid() & 0xffff, Seq: 1,
 			Data: []byte("ping latency test"),
@@ -42,31 +43,35 @@ func Ping(srcAddress string, dstAddress string) (time.Duration, error) {
 	}
 	wb, err := wm.Marshal(nil)
 	if err != nil {
+		log.LLvl1("Problem marshalling message to binary fields")
 		return 0, err
 	}
 
 	sendingTime := time.Now()
-	if _, err := c.WriteTo(wb, &net.UDPAddr{IP: net.ParseIP(dstAddress), Zone: "en0"}); err != nil {
+	if _, err := c.WriteTo(wb, &net.UDPAddr{IP: net.ParseIP(dstAddress)}); err != nil {
+		log.LLvl1("Problem sending message via icmp")
 		return 0, err
 	}
 
 	rb := make([]byte, 1500)
 	n, peer, err := c.ReadFrom(rb)
 	if err != nil {
+		log.LLvl1("Problem reading icmp message")
 		return 0, err
 	}
 
 	latency := time.Now().Sub(sendingTime)
 	rm, err := icmp.ParseMessage(58, rb[:n])
 	if err != nil {
+		log.LLvl1("Problem parsing icmp message")
 		return 0, err
 	}
 	switch rm.Type {
-	case ipv6.ICMPTypeEchoReply:
-		log.Printf("got reflection from %v", peer)
+	case ipv4.ICMPTypeExtendedEchoReply:
+		log.LLvl1("got reflection from " + peer.String())
 		return latency, nil
 	default:
-		log.Printf("got %+v; want echo reply", rm)
+		log.LLvl1("got " + string((*rm).Code) + "; want echo reply s")
 	}
 
 	return 0, errors.New("Did not receive reply")

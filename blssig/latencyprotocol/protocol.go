@@ -86,7 +86,7 @@ func (Node *Node) AddBlock(chain *Chain) {
 	nbLatenciesNeeded := min(nbLatencies, len(chain.Blocks))
 
 	//for now just ping the first ones
-	for i := 0; i < nbLatenciesNeeded; i++ {
+	for i := 0; i < nbLatenciesNeeded && i < len(chain.Blocks); i++ {
 		Node.sendMessage1(chain.Blocks[i].ID)
 	}
 }

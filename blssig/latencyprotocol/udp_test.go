@@ -9,14 +9,11 @@ import (
 	"testing"
 )
 
-const srcAddress = "127.0.0.1:2001"
-const dstAddress = "127.0.0.1:2000"
-
 func TestListeningInit(t *testing.T) {
 	var wg sync.WaitGroup
 	finish := make(chan bool, 1)
 	ready := make(chan bool, 1)
-	InitListening(dstAddress, finish, ready, &wg)
+	InitListening("127.0.0.1:30001", finish, ready, &wg)
 	readySig := <-ready
 	finish <- true
 	wg.Wait()
@@ -34,13 +31,13 @@ func TestSendOneMessage(t *testing.T) {
 	finish := make(chan bool, 1)
 	ready := make(chan bool, 1)
 
-	receptionChannel := InitListening(dstAddress, finish, ready, &wg)
+	receptionChannel := InitListening(el.List[1].Address.NetworkAddress(), finish, ready, &wg)
 
 	pub, _, _ := sigAlg.GenerateKey(nil)
 
 	msg := PingMsg{*el.List[0], *el.List[1], 10, pub, make([]byte, 0), make([]byte, 0)}
 
-	err := SendMessage(msg, srcAddress, dstAddress)
+	err := SendMessage(msg, el.List[0].Address.NetworkAddress(), el.List[1].Address.NetworkAddress())
 
 	require.NoError(t, err)
 	received := <-receptionChannel
@@ -63,6 +60,9 @@ func TestSendTwoMessages(t *testing.T) {
 	var wg sync.WaitGroup
 	finish := make(chan bool, 1)
 	ready := make(chan bool, 1)
+
+	dstAddress := el.List[1].Address.NetworkAddress()
+	srcAddress := el.List[0].Address.NetworkAddress()
 
 	receptionChannel := InitListening(dstAddress, finish, ready, &wg)
 
