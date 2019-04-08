@@ -13,6 +13,7 @@ import (
 )
 
 const checkForStopSignal = time.Duration(7 * time.Millisecond)
+const readMessageSize = 1024
 
 //PingMsg represents a message sent to another validator
 type PingMsg struct {
@@ -27,7 +28,7 @@ type PingMsg struct {
 
 //InitListening allows the start of listening for pings on the server
 func InitListening(srcAddress string, finish <-chan bool, ready chan<- bool, wg *sync.WaitGroup) chan PingMsg {
-	log.LLvl1("Init UDP listening on " + srcAddress)
+	log.LLvl3("Init UDP listening on " + srcAddress)
 	receive := make(chan PingMsg, 100)
 	wg.Add(1)
 	go listen(receive, srcAddress, finish, ready, wg)
@@ -36,10 +37,10 @@ func InitListening(srcAddress string, finish <-chan bool, ready chan<- bool, wg 
 
 func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready chan<- bool, wg *sync.WaitGroup) {
 
-	log.LLvl1("Setting up address")
+	log.LLvl3("Setting up address")
 	nodeAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
 
-	log.LLvl1("Open connection")
+	log.LLvl3("Open connection")
 	connection, err := net.ListenUDP("udp", nodeAddress)
 	if err != nil {
 		log.Warn(err)
@@ -49,23 +50,23 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 	defer connection.Close()
 
 	ready <- true
-	log.LLvl1("Start listening")
+	log.LLvl3("Start listening")
 	for {
 		select {
 		case <-finish:
-			log.LLvl1("Listen stopping")
+			log.LLvl3("Listen stopping")
 			connection.Close()
 			wg.Done()
 			return
 		default:
-			inputBytes := make([]byte, 1024)
+			inputBytes := make([]byte, readMessageSize)
 			connection.SetReadDeadline(time.Now().Add(checkForStopSignal))
 			len, _, err := connection.ReadFrom(inputBytes)
 			if err != nil && !strings.Contains(err.Error(), "i/o timeout") {
 				log.Warn(err)
 			}
 			if len > 0 {
-				log.LLvl1("Received message")
+				log.LLvl3("Received message")
 				var msg PingMsg
 				err = protobuf.Decode(inputBytes, &msg)
 				if err != nil {
@@ -79,23 +80,23 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 
 //SendMessage lets a server ping another server
 func SendMessage(message PingMsg, srcAddress string, dstAddress string) error {
-	log.LLvl1("Sending message to " + dstAddress)
+	log.LLvl3("Sending message to " + dstAddress)
 	destinationAddress, _ := net.ResolveUDPAddr("udp", dstAddress)
 	sourceAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
 
 	connection, err := net.DialUDP("udp", sourceAddress, destinationAddress)
 	if err != nil {
-		log.LLvl1("Could not dial up")
+		log.LLvl3("Could not dial up")
 		return err
 	}
 	defer connection.Close()
 
 	encoded, err := protobuf.Encode(&message)
 	if err != nil {
-		log.LLvl1("Could not encode message")
+		log.LLvl3("Could not encode message")
 		return err
 	}
-	log.LLvl1("Writing message to channel")
+	log.LLvl3("Writing message to channel")
 	connection.Write(encoded)
 	return nil
 }

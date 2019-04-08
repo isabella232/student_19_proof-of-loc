@@ -32,8 +32,6 @@ func TestMain(m *testing.M) {
 
 func TestCosi(t *testing.T) {
 
-	//log.SetDebugVisible(2)
-
 	for _, nbrHosts := range []int{4, 7} {
 
 		log.Lvl2("Running cosi with", nbrHosts, "hosts")

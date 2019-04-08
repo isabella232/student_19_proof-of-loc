@@ -122,47 +122,80 @@ func InterAddressPing(srcAddress1 string, dstAddress1 string, srcAddress2 string
 }
 
 //Do this before running test on linux: sudo sysctl -w net.ipv4.ping_group_range="0   2147483647"
-//Tool ofr slowing down latencies: https://bencane.com/2012/07/16/tc-adding-simulated-network-latency-to-your-linux-server/
+//Tool for slowing down latencies: https://bencane.com/2012/07/16/tc-adding-simulated-network-latency-to-your-linux-server/
 func TestCompareLatenciesToPings(t *testing.T) {
 
-	rand.New(nil)
-	log.LLvl1("Make chain")
-	nodes, chain, err := constructBlocks()
+	NbIterations := 10
 
-	require.NoError(t, err)
+	block1Latencies := make([]time.Duration, 10)
+	block2Latencies := make([]time.Duration, 10)
+	ping1Latencies := make([]time.Duration, 10)
+	ping2Latencies := make([]time.Duration, 10)
 
-	latency0, err := InterAddressPing(
-		nodes[0].SendingAddress.NetworkAddress(),
-		nodes[1].ID.ServerID.Address.NetworkAddress(),
-		nodes[1].SendingAddress.NetworkAddress(),
-		nodes[0].ID.ServerID.Address.NetworkAddress())
-	require.NoError(t, err)
+	sumBlock1 := time.Duration(0)
+	sumBlock2 := time.Duration(0)
+	sumPing1 := time.Duration(0)
+	sumPing2 := time.Duration(0)
 
-	latency1, err :=
-		InterAddressPing(
-			nodes[1].SendingAddress.NetworkAddress(),
-			nodes[0].ID.ServerID.Address.NetworkAddress(),
+	for i := 0; i < NbIterations; i++ {
+		time.Sleep(10 * time.Millisecond)
+		rand.New(nil)
+		log.LLvl1("Make chain")
+		nodes, chain, err := constructBlocks()
+
+		require.NoError(t, err)
+
+		latency0, err := InterAddressPing(
 			nodes[0].SendingAddress.NetworkAddress(),
-			nodes[1].ID.ServerID.Address.NetworkAddress())
-	require.NoError(t, err)
+			nodes[1].ID.ServerID.Address.NetworkAddress(),
+			nodes[1].SendingAddress.NetworkAddress(),
+			nodes[0].ID.ServerID.Address.NetworkAddress())
+		require.NoError(t, err)
 
-	expectedConfLat0, lat0here := chain.Blocks[1].Latencies[string(nodes[1].ID.PublicKey)]
-	expectedConfLat1, lat1here := chain.Blocks[2].Latencies[string(nodes[0].ID.PublicKey)]
+		latency1, err :=
+			InterAddressPing(
+				nodes[1].SendingAddress.NetworkAddress(),
+				nodes[0].ID.ServerID.Address.NetworkAddress(),
+				nodes[0].SendingAddress.NetworkAddress(),
+				nodes[1].ID.ServerID.Address.NetworkAddress())
+		require.NoError(t, err)
 
-	expectedLat0 := expectedConfLat0.Latency
-	expectedLat1 := expectedConfLat1.Latency
+		expectedConfLat0, lat0here := chain.Blocks[1].Latencies[string(nodes[1].ID.PublicKey)]
+		expectedConfLat1, lat1here := chain.Blocks[2].Latencies[string(nodes[0].ID.PublicKey)]
 
-	require.True(t, lat0here, "Expected latency 1 not found")
-	require.True(t, lat1here, "Expected latency 2 not found")
+		require.True(t, lat0here)
+		require.True(t, lat1here)
 
-	log.LLvl1("Block latency 1: " + expectedLat0.String())
-	log.LLvl1("Ping latency 1: " + latency0.String())
-	log.LLvl1("Difference: " + (expectedLat0 - latency0).String())
+		expectedLat0 := expectedConfLat0.Latency
+		expectedLat1 := expectedConfLat1.Latency
 
-	log.LLvl1("Block latency 2: " + expectedLat1.String())
-	log.LLvl1("Ping latency 2: " + latency1.String())
-	log.LLvl1("Difference: " + (expectedLat1 - latency1).String())
+		block1Latencies[i] = expectedLat0
+		block2Latencies[i] = expectedLat1
+		ping1Latencies[i] = latency0
+		ping2Latencies[i] = latency1
 
-	require.True(t, (expectedLat0-latency0) < benchmarkDelta && (latency0-expectedLat0) < benchmarkDelta)
-	require.True(t, (expectedLat1-latency1) < benchmarkDelta && (latency1-expectedLat1) < benchmarkDelta)
+		sumBlock1 += expectedLat0
+		sumBlock2 += expectedLat1
+		sumPing1 += latency0
+		sumPing2 += latency1
+
+	}
+
+	avgBlock1 := (sumBlock1 / time.Duration(NbIterations))
+	avgBlock2 := (sumBlock2 / time.Duration(NbIterations))
+
+	avgPing1 := (sumPing1 / time.Duration(NbIterations))
+	avgPing2 := (sumPing2 / time.Duration(NbIterations))
+
+	log.LLvl1("--------------------------------------------------")
+
+	log.LLvl1("Average Block latency 1: 	" + avgBlock1.String())
+	log.LLvl1("Average Ping latency 1: 	" + avgPing1.String())
+	log.LLvl1("Difference: 				" + (avgBlock1 - avgPing1).String())
+
+	log.LLvl1("--------------------------------------------------")
+
+	log.LLvl1("Average Block latency 2: 	" + avgBlock2.String())
+	log.LLvl1("Average Ping latency 2: 	" + avgPing2.String())
+	log.LLvl1("Difference: 				" + (avgBlock2 - avgPing2).String())
 }
