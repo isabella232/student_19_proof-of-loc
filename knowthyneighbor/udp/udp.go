@@ -47,19 +47,19 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 		wg.Done()
 		return
 	}
-	defer connection.Close()
 
 	ready <- true
 	log.LLvl3("Start listening")
-	inputBytes := make([]byte, readMessageSize)
 	for {
 		select {
 		case <-finish:
 			log.LLvl3("Listen stopping")
+			close(receive)
 			connection.Close()
 			wg.Done()
 			return
 		default:
+			inputBytes := make([]byte, readMessageSize)
 			connection.SetReadDeadline(time.Now().Add(checkForStopSignal))
 			len, _, err := connection.ReadFrom(inputBytes)
 			if err != nil && !strings.Contains(err.Error(), "i/o timeout") {
@@ -90,14 +90,15 @@ func SendMessage(message PingMsg, srcAddress string, dstAddress string) error {
 		log.LLvl3("Could not dial up")
 		return err
 	}
-	defer connection.Close()
 
 	encoded, err := protobuf.Encode(&message)
 	if err != nil {
 		log.LLvl3("Could not encode message")
+		connection.Close()
 		return err
 	}
 	log.LLvl3("Writing message to channel")
 	connection.Write(encoded)
+	connection.Close()
 	return nil
 }

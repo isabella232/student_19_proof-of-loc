@@ -8,6 +8,7 @@ import (
 	sigAlg "golang.org/x/crypto/ed25519"
 	"sync"
 	"testing"
+	"time"
 )
 
 var tSuite = pairing.NewSuiteBn256()
@@ -20,21 +21,31 @@ func TestListeningInit(t *testing.T) {
 	readySig := <-ready
 	finish <- true
 	wg.Wait()
+	close(finish)
+	close(ready)
 	require.True(t, readySig)
+	log.AfterTest(t)
+}
+
+func TestMemoryLeaksCausedByLocal(t *testing.T) {
+	local := onet.NewTCPTest(tSuite)
+	local.CloseAll()
+	err := local.WaitDone(30 * time.Second)
+	require.NoError(t, err, "Did not close all in time")
+	log.LLvl1("Closed all in time")
 }
 
 func TestSendOneMessage(t *testing.T) {
 	local := onet.NewTCPTest(tSuite)
-
 	_, el, _ := local.GenTree(2, false)
-
-	defer local.CloseAll()
 
 	var wg sync.WaitGroup
 	finish := make(chan bool, 1)
 	ready := make(chan bool, 1)
 
 	receptionChannel := InitListening(el.List[1].Address.NetworkAddress(), finish, ready, &wg)
+
+	<-ready
 
 	pub, _, _ := sigAlg.GenerateKey(nil)
 
@@ -48,8 +59,13 @@ func TestSendOneMessage(t *testing.T) {
 	finish <- true
 	wg.Wait()
 
+	close(ready)
+	close(finish)
+
 	require.NotNil(t, received)
 	require.Equal(t, 10, received.SeqNb)
+	local.CloseAll()
+	log.AfterTest(t)
 
 }
 
@@ -57,8 +73,6 @@ func TestSendTwoMessages(t *testing.T) {
 	local := onet.NewTCPTest(tSuite)
 
 	_, el, _ := local.GenTree(2, false)
-
-	defer local.CloseAll()
 
 	var wg sync.WaitGroup
 	finish := make(chan bool, 1)
@@ -68,6 +82,8 @@ func TestSendTwoMessages(t *testing.T) {
 	srcAddress := el.List[0].Address.NetworkAddress()
 
 	receptionChannel := InitListening(dstAddress, finish, ready, &wg)
+
+	<-ready
 
 	pub, _, _ := sigAlg.GenerateKey(nil)
 
@@ -93,5 +109,8 @@ func TestSendTwoMessages(t *testing.T) {
 
 	require.NotNil(t, received2)
 	require.Equal(t, 11, received2.SeqNb)
+
+	local.CloseAll()
+	log.AfterTest(t)
 
 }
