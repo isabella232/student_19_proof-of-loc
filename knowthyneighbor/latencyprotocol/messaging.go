@@ -8,7 +8,6 @@ import (
 	sigAlg "golang.org/x/crypto/ed25519"
 	"math"
 	"math/rand"
-	"strconv"
 	"time"
 )
 
@@ -60,6 +59,14 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 
 	nonce := Nonce(rand.Intn(math.MaxInt32))
 
+	encodedKey := string(dstNodeID.PublicKey)
+	_, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
+
+	if alreadyStarted {
+		log.Warn("Already started messaging this node")
+		return errors.New("Already started messaging this node")
+	}
+
 	timestamp := time.Now()
 
 	msgContent := &PingMsg1{
@@ -67,31 +74,9 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 		Timestamp: timestamp,
 	}
 
-	encodedKey := string(dstNodeID.PublicKey)
-	_, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
-
-	if alreadyStarted {
-		return errors.New("Already started messaging this node")
-	}
-
-	latConstr := LatencyConstructor{
-		StartedLocally:    true,
-		CurrentMsgNb:      1,
-		DstID:             dstNodeID,
-		Nonce:             nonce,
-		LocalTimestamps:   make([]time.Time, 2),
-		ForeignTimestamps: make([]time.Time, 2),
-		ClockSkews:        make([]time.Duration, 2),
-		Latency:           0,
-		SignedLatency:     nil,
-	}
-
-	latConstr.LocalTimestamps[0] = timestamp
-
-	Node.LatenciesInConstruction[encodedKey] = &latConstr
-
 	unsigned, err := protobuf.Encode(msgContent)
 	if err != nil {
+		log.Warn(err)
 		return err
 	}
 
@@ -110,12 +95,27 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 	srcAddress := Node.SendingAddress.NetworkAddress()
 	dstAddress := dstNodeID.ServerID.Address.NetworkAddress()
 
-	log.LLvl1("Sending message 1 from " + srcAddress + " to " + dstAddress)
-
 	err = udp.SendMessage(msg, srcAddress, dstAddress)
 	if err != nil {
+		log.Warn(err)
 		return err
 	}
+
+	latConstr := LatencyConstructor{
+		StartedLocally:    true,
+		CurrentMsgNb:      1,
+		DstID:             dstNodeID,
+		Nonce:             nonce,
+		LocalTimestamps:   make([]time.Time, 2),
+		ForeignTimestamps: make([]time.Time, 2),
+		ClockSkews:        make([]time.Duration, 2),
+		Latency:           0,
+		SignedLatency:     nil,
+	}
+
+	latConstr.LocalTimestamps[0] = timestamp
+
+	Node.LatenciesInConstruction[encodedKey] = &latConstr
 
 	return nil
 
@@ -128,6 +128,7 @@ func (Node *Node) checkMessage1(msg *udp.PingMsg) (*PingMsg1, bool) {
 
 	sigCorrect := sigAlg.Verify(newPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
+		log.Warn("Incorrect signature from message")
 		return nil, false
 	}
 
@@ -135,16 +136,19 @@ func (Node *Node) checkMessage1(msg *udp.PingMsg) (*PingMsg1, bool) {
 	_, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
 
 	if alreadyStarted {
+		log.Warn("Already started messaging this node")
 		return nil, false
 	}
 
 	content := PingMsg1{}
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
+		log.Warn("Could not decode message")
 		return nil, false
 	}
 
 	if !isFresh(content.Timestamp, freshnessDelta) {
+		log.Warn("Timestamp too old")
 		return nil, false
 	}
 
@@ -152,30 +156,12 @@ func (Node *Node) checkMessage1(msg *udp.PingMsg) (*PingMsg1, bool) {
 
 }
 
-func (Node *Node) sendMessage2(msg *udp.PingMsg, msgContent *PingMsg1) {
+func (Node *Node) sendMessage2(msg *udp.PingMsg, msgContent *PingMsg1) error {
 	log.LLvl1("Sending message 2")
 
 	nonce := Nonce(rand.Intn(math.MaxInt32))
 
-	latencyConstr := LatencyConstructor{
-		StartedLocally:    false,
-		CurrentMsgNb:      2,
-		DstID:             &NodeID{&msg.Src, msg.PublicKey},
-		Nonce:             nonce,
-		LocalTimestamps:   make([]time.Time, 2),
-		ForeignTimestamps: make([]time.Time, 2),
-		ClockSkews:        make([]time.Duration, 2),
-		Latency:           0,
-		SignedLatency:     nil,
-	}
-
-	encodedKey := string(msg.PublicKey)
-	Node.LatenciesInConstruction[encodedKey] = &latencyConstr
-
 	localtime := time.Now()
-	latencyConstr.LocalTimestamps[0] = localtime
-	latencyConstr.ForeignTimestamps[0] = msgContent.Timestamp
-	latencyConstr.ClockSkews[0] = localtime.Sub(msgContent.Timestamp)
 
 	msg2Content := &PingMsg2{
 		SrcNonce:  nonce,
@@ -185,8 +171,8 @@ func (Node *Node) sendMessage2(msg *udp.PingMsg, msgContent *PingMsg1) {
 
 	unsigned, err := protobuf.Encode(msg2Content)
 	if err != nil {
-		log.LLvl1(err)
-		return
+		log.Warn(err)
+		return err
 	}
 
 	signed := sigAlg.Sign(Node.PrivateKey, unsigned)
@@ -204,9 +190,32 @@ func (Node *Node) sendMessage2(msg *udp.PingMsg, msgContent *PingMsg1) {
 	srcAddress := Node.SendingAddress.NetworkAddress()
 	dstAddress := msg.Src.Address.NetworkAddress()
 
-	log.LLvl1("Sending message 2 from " + srcAddress + " to " + dstAddress)
+	err = udp.SendMessage(newMsg, srcAddress, dstAddress)
+	if err != nil {
+		log.Warn(err)
+		return err
+	}
 
-	udp.SendMessage(newMsg, srcAddress, dstAddress)
+	latencyConstr := LatencyConstructor{
+		StartedLocally:    false,
+		CurrentMsgNb:      2,
+		DstID:             &NodeID{&msg.Src, msg.PublicKey},
+		Nonce:             nonce,
+		LocalTimestamps:   make([]time.Time, 2),
+		ForeignTimestamps: make([]time.Time, 2),
+		ClockSkews:        make([]time.Duration, 2),
+		Latency:           0,
+		SignedLatency:     nil,
+	}
+
+	encodedKey := string(msg.PublicKey)
+	Node.LatenciesInConstruction[encodedKey] = &latencyConstr
+
+	latencyConstr.LocalTimestamps[0] = localtime
+	latencyConstr.ForeignTimestamps[0] = msgContent.Timestamp
+	latencyConstr.ClockSkews[0] = localtime.Sub(msgContent.Timestamp)
+
+	return nil
 
 }
 
@@ -218,7 +227,7 @@ func (Node *Node) checkMessage2(msg *udp.PingMsg) (*PingMsg2, bool) {
 	//check signature
 	sigCorrect := sigAlg.Verify(senderPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
-		log.LLvl1("Signature incorrect")
+		log.Warn("Signature incorrect")
 		return nil, false
 	}
 
@@ -227,7 +236,7 @@ func (Node *Node) checkMessage2(msg *udp.PingMsg) (*PingMsg2, bool) {
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
 
 	if !alreadyStarted {
-		log.LLvl1("Not started yet")
+		log.Warn("Not started yet")
 		return nil, false
 	}
 
@@ -235,26 +244,25 @@ func (Node *Node) checkMessage2(msg *udp.PingMsg) (*PingMsg2, bool) {
 	content := PingMsg2{}
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
-		log.LLvl1(err)
+		log.Warn(err)
 		return nil, false
 	}
 
 	//check freshness
 	if !isFresh(content.Timestamp, freshnessDelta) {
-		log.LLvl1("Not fresh enough")
+		log.Warn("Not fresh enough")
 		return nil, false
 	}
 
 	//Check message 2 sent after message 1
 	if content.Timestamp.Before(latencyConstr.LocalTimestamps[0]) {
-		log.LLvl1("Timestamp order wrong")
+		log.Warn("Timestamp order wrong")
 		return nil, false
 	}
 
 	//check nonce
 	if content.DstNonce != latencyConstr.Nonce {
-		log.LLvl1("Wrong nonce - Local: " + strconv.Itoa(int(latencyConstr.Nonce)))
-		log.LLvl1("Sent: " + strconv.Itoa(int(content.DstNonce)))
+		log.Warn("Wrong nonce")
 		return nil, false
 	}
 
@@ -262,23 +270,23 @@ func (Node *Node) checkMessage2(msg *udp.PingMsg) (*PingMsg2, bool) {
 
 }
 
-func (Node *Node) sendMessage3(msg *udp.PingMsg, msgContent *PingMsg2) {
+func (Node *Node) sendMessage3(msg *udp.PingMsg, msgContent *PingMsg2) error {
 	log.LLvl1("Sending message 3")
 
 	encodedKey := string(msg.PublicKey)
 	latencyConstr := Node.LatenciesInConstruction[encodedKey]
-	latencyConstr.CurrentMsgNb += 2
 
 	localtime := time.Now()
-	latencyConstr.LocalTimestamps[1] = localtime
-	latencyConstr.ForeignTimestamps[0] = msgContent.Timestamp
-	latencyConstr.ClockSkews[0] = localtime.Sub(msgContent.Timestamp)
 
 	latency := localtime.Sub(latencyConstr.LocalTimestamps[0])
-	latencyConstr.Latency = latency
-	unsignedLatency, err := protobuf.Encode(latency)
+
+	unsignedLatency, err := protobuf.Encode(&LatencyWrapper{latency})
+	if err != nil {
+		log.Warn(err)
+		return err
+	}
+
 	signedLatency := sigAlg.Sign(Node.PrivateKey, unsignedLatency)
-	latencyConstr.SignedLatency = signedLatency
 
 	msg3Content := &PingMsg3{
 		DstNonce:      msgContent.SrcNonce,
@@ -288,8 +296,8 @@ func (Node *Node) sendMessage3(msg *udp.PingMsg, msgContent *PingMsg2) {
 
 	unsignedContent, err := protobuf.Encode(msg3Content)
 	if err != nil {
-		log.LLvl1(err)
-		return
+		log.Warn(err)
+		return err
 	}
 
 	signedContent := sigAlg.Sign(Node.PrivateKey, unsignedContent)
@@ -306,9 +314,20 @@ func (Node *Node) sendMessage3(msg *udp.PingMsg, msgContent *PingMsg2) {
 	srcAddress := Node.SendingAddress.NetworkAddress()
 	dstAddress := msg.Src.Address.NetworkAddress()
 
-	log.LLvl1("Sending message 3 from " + srcAddress + " to " + dstAddress)
+	err = udp.SendMessage(newMsg, srcAddress, dstAddress)
+	if err != nil {
+		log.Warn(err)
+		return err
+	}
 
-	udp.SendMessage(newMsg, srcAddress, dstAddress)
+	latencyConstr.CurrentMsgNb += 2
+	latencyConstr.LocalTimestamps[1] = localtime
+	latencyConstr.ForeignTimestamps[0] = msgContent.Timestamp
+	latencyConstr.ClockSkews[0] = localtime.Sub(msgContent.Timestamp)
+	latencyConstr.Latency = latency
+	latencyConstr.SignedLatency = signedLatency
+
+	return nil
 
 }
 
@@ -321,7 +340,7 @@ func (Node *Node) checkMessage3(msg *udp.PingMsg) (*PingMsg3, bool) {
 	//check signature
 	sigCorrect := sigAlg.Verify(senderPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
-		log.LLvl1("Signature incorrect")
+		log.Warn("Signature incorrect")
 		return nil, false
 	}
 
@@ -330,7 +349,7 @@ func (Node *Node) checkMessage3(msg *udp.PingMsg) (*PingMsg3, bool) {
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
 
 	if !alreadyStarted {
-		log.LLvl1("Not started yet")
+		log.Warn("Not started yet")
 		return nil, false
 	}
 
@@ -338,7 +357,7 @@ func (Node *Node) checkMessage3(msg *udp.PingMsg) (*PingMsg3, bool) {
 	content := PingMsg3{}
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
-		log.LLvl1(err)
+		log.Warn(err)
 		return nil, false
 	}
 
@@ -347,13 +366,13 @@ func (Node *Node) checkMessage3(msg *udp.PingMsg) (*PingMsg3, bool) {
 
 	//check freshness
 	if !isFresh(sigTimestamp, freshnessDelta) {
-		log.LLvl1("Old message")
+		log.Warn("Old message")
 		return nil, false
 	}
 
 	//check nonce
 	if content.DstNonce != latencyConstr.Nonce {
-		log.LLvl1("Nonce wrong")
+		log.Warn("Nonce wrong")
 		return nil, false
 	}
 
@@ -361,44 +380,39 @@ func (Node *Node) checkMessage3(msg *udp.PingMsg) (*PingMsg3, bool) {
 
 }
 
-func (Node *Node) sendMessage4(msg *udp.PingMsg, msgContent *PingMsg3) {
+func (Node *Node) sendMessage4(msg *udp.PingMsg, msgContent *PingMsg3) error {
 	log.LLvl1("Sending message 4")
 
 	encodedKey := string(msg.PublicKey)
 	latencyConstr := Node.LatenciesInConstruction[encodedKey]
-	latencyConstr.CurrentMsgNb += 2
 
 	localtime := time.Now()
-	latencyConstr.LocalTimestamps[1] = localtime
 	latencyConstr.ClockSkews[1] = localtime.Sub(latencyConstr.ForeignTimestamps[1])
 
 	if !acceptableDifference(latencyConstr.ClockSkews[0], latencyConstr.ClockSkews[1], intervallDelta) {
-		log.LLvl1("Clock Skews too different")
-		return
+		log.Warn("Clock Skews too different")
+		return errors.New("Clock Skews too different")
 	}
 
 	localLatency := localtime.Sub(latencyConstr.LocalTimestamps[0])
 
-	latencyConstr.Latency = localLatency
-
 	if !acceptableDifference(localLatency, msgContent.Latency, intervallDelta) {
-		log.LLvl1("Latencies too different")
-		return
+		log.Warn("Latencies too different")
+		return errors.New("Latencies too different")
 	}
 
 	unsignedLocalLatency, err := protobuf.Encode(&LatencyWrapper{localLatency})
 	if err != nil {
-		log.LLvl1(err)
-		return
+		log.Warn(err)
+		return err
 	}
 	signedLocalLatency := sigAlg.Sign(Node.PrivateKey, unsignedLocalLatency)
-	latencyConstr.SignedLatency = signedLocalLatency
 
 	signedForeignLatency := SignedForeignLatency{localtime, msgContent.SignedLatency}
 	signedForeignLatencyBytes, err := protobuf.Encode(&signedForeignLatency)
 	if err != nil {
-		log.LLvl1(err)
-		return
+		log.Warn(err)
+		return err
 	}
 
 	doubleSignedforeignLatency := sigAlg.Sign(Node.PrivateKey, signedForeignLatencyBytes)
@@ -412,8 +426,8 @@ func (Node *Node) sendMessage4(msg *udp.PingMsg, msgContent *PingMsg3) {
 
 	unsignedContent, err := protobuf.Encode(msg4Content)
 	if err != nil {
-		log.LLvl1(err)
-		return
+		log.Warn(err)
+		return err
 	}
 
 	signedContent := sigAlg.Sign(Node.PrivateKey, unsignedContent)
@@ -431,9 +445,18 @@ func (Node *Node) sendMessage4(msg *udp.PingMsg, msgContent *PingMsg3) {
 	srcAddress := Node.SendingAddress.NetworkAddress()
 	dstAddress := msg.Src.Address.NetworkAddress()
 
-	log.LLvl1("Sending message 4 from " + srcAddress + " to " + dstAddress)
+	err = udp.SendMessage(newMsg, srcAddress, dstAddress)
+	if err != nil {
+		log.Warn(err)
+		return err
+	}
 
-	udp.SendMessage(newMsg, srcAddress, dstAddress)
+	latencyConstr.Latency = localLatency
+	latencyConstr.LocalTimestamps[1] = localtime
+	latencyConstr.SignedLatency = signedLocalLatency
+	latencyConstr.CurrentMsgNb += 2
+
+	return nil
 
 }
 
@@ -445,7 +468,7 @@ func (Node *Node) checkMessage4(msg *udp.PingMsg) (*PingMsg4, bool) {
 	//check signature
 	sigCorrect := sigAlg.Verify(senderPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
-		log.LLvl1("Signature incorrect")
+		log.Warn("Signature incorrect")
 		return nil, false
 	}
 
@@ -454,7 +477,7 @@ func (Node *Node) checkMessage4(msg *udp.PingMsg) (*PingMsg4, bool) {
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
 
 	if !alreadyStarted {
-		log.LLvl1("Not started yet")
+		log.Warn("Not started yet")
 		return nil, false
 	}
 
@@ -462,7 +485,7 @@ func (Node *Node) checkMessage4(msg *udp.PingMsg) (*PingMsg4, bool) {
 	content := PingMsg4{}
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
-		log.LLvl1(err)
+		log.Warn(err)
 		return nil, false
 	}
 
@@ -471,42 +494,38 @@ func (Node *Node) checkMessage4(msg *udp.PingMsg) (*PingMsg4, bool) {
 
 	//check freshness
 	if !isFresh(sentTimestamp, freshnessDelta) {
-		log.LLvl1("Not fresh enough")
+		log.Warn("Not fresh enough")
 		return nil, false
 	}
-
-	log.LLvl1("Returning new latency from message 5")
 
 	return &content, true
 
 }
 
-func (Node *Node) sendMessage5(msg *udp.PingMsg, msgContent *PingMsg4) *ConfirmedLatency {
+func (Node *Node) sendMessage5(msg *udp.PingMsg, msgContent *PingMsg4) (*ConfirmedLatency, error) {
 	log.LLvl1("Sending message 5")
 
 	encodedKey := string(msg.PublicKey)
 	latencyConstr := Node.LatenciesInConstruction[encodedKey]
-	latencyConstr.CurrentMsgNb += 2
 
 	localtime := time.Now()
-	latencyConstr.LocalTimestamps[1] = localtime
 	latencyConstr.ClockSkews[1] = localtime.Sub(latencyConstr.ForeignTimestamps[1])
 
 	if !acceptableDifference(latencyConstr.ClockSkews[0], latencyConstr.ClockSkews[1], intervallDelta) {
-		log.LLvl1("Clock Skews too different")
-		return nil
+		log.Warn("Clock Skews too different")
+		return nil, errors.New("Clock Skews too different")
 	}
 
 	if !acceptableDifference(latencyConstr.Latency, msgContent.LocalLatency, intervallDelta) {
 		log.LLvl1("Latencies too different")
-		return nil
+		return nil, errors.New("Latencies too different")
 	}
 
 	signedForeignLatency := SignedForeignLatency{localtime, msgContent.SignedLocalLatency}
 	signedForeignLatencyBytes, err := protobuf.Encode(&signedForeignLatency)
 	if err != nil {
-		log.LLvl1(err)
-		return nil
+		log.Warn(err)
+		return nil, err
 	}
 
 	doubleSignedforeignLatency := sigAlg.Sign(Node.PrivateKey, signedForeignLatencyBytes)
@@ -518,8 +537,8 @@ func (Node *Node) sendMessage5(msg *udp.PingMsg, msgContent *PingMsg4) *Confirme
 
 	unsignedContent, err := protobuf.Encode(msg5Content)
 	if err != nil {
-		log.LLvl1(err)
-		return nil
+		log.Warn(err)
+		return nil, err
 	}
 
 	signedContent := sigAlg.Sign(Node.PrivateKey, unsignedContent)
@@ -537,9 +556,10 @@ func (Node *Node) sendMessage5(msg *udp.PingMsg, msgContent *PingMsg4) *Confirme
 	srcAddress := Node.SendingAddress.NetworkAddress()
 	dstAddress := msg.Src.Address.NetworkAddress()
 
-	log.LLvl1("Sending message 5 from " + srcAddress + " to " + dstAddress)
-
 	udp.SendMessage(newMsg, srcAddress, dstAddress)
+
+	latencyConstr.CurrentMsgNb += 2
+	latencyConstr.LocalTimestamps[1] = localtime
 
 	newLatency := &ConfirmedLatency{
 		Latency:            latencyConstr.Latency,
@@ -548,7 +568,7 @@ func (Node *Node) sendMessage5(msg *udp.PingMsg, msgContent *PingMsg4) *Confirme
 		SignedConfirmation: msgContent.DoubleSignedForeignLatency,
 	}
 
-	return newLatency
+	return newLatency, nil
 
 }
 
@@ -560,7 +580,7 @@ func (Node *Node) checkMessage5(msg *udp.PingMsg) (*ConfirmedLatency, bool) {
 	//check signature
 	sigCorrect := sigAlg.Verify(senderPubKey, msg.UnsignedContent, msg.SignedContent)
 	if !sigCorrect {
-		log.LLvl1("Signature incorrect")
+		log.Warn("Signature incorrect")
 		return nil, false
 	}
 
@@ -569,7 +589,7 @@ func (Node *Node) checkMessage5(msg *udp.PingMsg) (*ConfirmedLatency, bool) {
 	latencyConstr, alreadyStarted := Node.LatenciesInConstruction[encodedKey]
 
 	if !alreadyStarted {
-		log.LLvl1("Already started")
+		log.Warn("Already started")
 		return nil, false
 	}
 
@@ -577,7 +597,7 @@ func (Node *Node) checkMessage5(msg *udp.PingMsg) (*ConfirmedLatency, bool) {
 	content := PingMsg5{}
 	err := protobuf.Decode(msg.UnsignedContent, &content)
 	if err != nil {
-		log.Error(err)
+		log.Warn(err)
 		return nil, false
 	}
 
@@ -585,13 +605,13 @@ func (Node *Node) checkMessage5(msg *udp.PingMsg) (*ConfirmedLatency, bool) {
 
 	//check freshness
 	if !isFresh(sentTimestamp, freshnessDelta) {
-		log.Error("Not fresh enough")
+		log.Warn("Not fresh enough")
 		return nil, false
 	}
 
 	//Check message 5 sent after message 4
 	if sentTimestamp.Before(latencyConstr.LocalTimestamps[1]) {
-		log.Error("Too old timestamp")
+		log.Warn("Too old timestamp")
 		return nil, false
 	}
 

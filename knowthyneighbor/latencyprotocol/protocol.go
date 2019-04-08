@@ -117,33 +117,49 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 				if messageOkay {
 					//Node.BlockSkeleton.ID = &NodeID{&newMsg.Src, newMsg.PublicKey}
 					// TODO what if multiple latencies try to connect to node at same time -> Node needs list of blocks in construction
-					Node.sendMessage2(&newMsg, msgContent)
+					err := Node.sendMessage2(&newMsg, msgContent)
+					if err != nil {
+						log.Warn(err.Error() + " - Could not send message: latency will not be recorded")
+						Node.LatenciesInConstruction[string(newMsg.PublicKey)] = nil
+					}
 				}
 			case 2:
 				log.LLvl1("Incoming message 2")
 				msgContent, messageOkay := Node.checkMessage2(&newMsg)
 				if messageOkay {
-					Node.sendMessage3(&newMsg, msgContent)
+					err := Node.sendMessage3(&newMsg, msgContent)
+					if err != nil {
+						log.Warn(err.Error() + " - Could not send message: latency will not be recorded")
+						Node.LatenciesInConstruction[string(newMsg.PublicKey)] = nil
+					}
+
 				}
 			case 3:
 				log.LLvl1("Incoming message 3")
 				msgContent, messageOkay := Node.checkMessage3(&newMsg)
 				if messageOkay {
-					Node.sendMessage4(&newMsg, msgContent)
+					err := Node.sendMessage4(&newMsg, msgContent)
+					if err != nil {
+						log.Warn(err.Error() + " - Could not send message: latency will not be recorded")
+						Node.LatenciesInConstruction[string(newMsg.PublicKey)] = nil
+					}
 				}
 			case 4:
 				log.LLvl1("Incoming message 4")
 				msgContent, messageOkay := Node.checkMessage4(&newMsg)
 				if messageOkay {
-					confirmedLatency := Node.sendMessage5(&newMsg, msgContent)
-
-					log.LLvl1("Adding new latency to block")
+					confirmedLatency, err := Node.sendMessage5(&newMsg, msgContent)
 					encodedKey := string(newMsg.PublicKey)
-					Node.BlockSkeleton.Latencies[encodedKey] = *confirmedLatency //signature content, not whole message
+					if err != nil {
+						log.Warn(err.Error() + " - Could not send final message: latency will not be recorded")
+					} else {
+						log.LLvl1("Adding new latency to block")
+						encodedKey := string(newMsg.PublicKey)
+						Node.BlockSkeleton.Latencies[encodedKey] = *confirmedLatency //signature content, not whole message
+						Node.NbLatenciesRefreshed++
+					}
 
-					//get rid of contructor
 					Node.LatenciesInConstruction[encodedKey] = nil
-					Node.NbLatenciesRefreshed++
 
 					if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock && nbLatenciesForNewBlock > 0 {
 						log.LLvl1("Sending up new block")
@@ -152,6 +168,7 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 
 					}
 				}
+
 			case 5:
 				log.LLvl1("Incoming message 5")
 				doubleSignedLatency, messageOkay := Node.checkMessage5(&newMsg)

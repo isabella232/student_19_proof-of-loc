@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -73,7 +74,7 @@ func constructBlocks() ([]*Node, *Chain, error) {
 
 }
 
-func InterAddressPing(srcAddress1 string, dstAddress1 string, srcAddress2 string, dstAddress2 string) (time.Duration, time.Duration, error) {
+func InterAddressPing(srcAddress1 string, dstAddress1 string, srcAddress2 string, dstAddress2 string) (time.Duration, error) {
 
 	var wg1 sync.WaitGroup
 	var wg2 sync.WaitGroup
@@ -88,29 +89,27 @@ func InterAddressPing(srcAddress1 string, dstAddress1 string, srcAddress2 string
 	<-readyToListenChannel1
 	<-readyToListenChannel2
 
-	msg1 := udp.PingMsg{}
-	msg2 := udp.PingMsg{}
+	msg := udp.PingMsg{}
 
 	startTime1 := time.Now()
-	err := udp.SendMessage(msg1, srcAddress1, dstAddress1)
+	err := udp.SendMessage(msg, srcAddress1, dstAddress1)
 	if err != nil {
 		finishListeningChannel1 <- true
 		finishListeningChannel2 <- true
-		return 0, 0, err
+		return 0, err
 	}
 
-	<-msgChannel1
-	endTime1 := time.Now()
+	sentMsg := <-msgChannel1
 
-	startTime2 := time.Now()
-	err = udp.SendMessage(msg2, srcAddress2, dstAddress2)
+	err = udp.SendMessage(sentMsg, srcAddress2, dstAddress2)
 	if err != nil {
 		finishListeningChannel1 <- true
 		finishListeningChannel2 <- true
-		return 0, 0, err
+		return 0, err
 	}
+
 	<-msgChannel2
-	endTime2 := time.Now()
+	endTime1 := time.Now()
 
 	finishListeningChannel1 <- true
 	finishListeningChannel2 <- true
@@ -118,7 +117,7 @@ func InterAddressPing(srcAddress1 string, dstAddress1 string, srcAddress2 string
 	wg1.Wait()
 	wg2.Wait()
 
-	return 2 * endTime1.Sub(startTime1), 2 * endTime2.Sub(startTime2), nil
+	return endTime1.Sub(startTime1), nil
 
 }
 
@@ -126,16 +125,25 @@ func InterAddressPing(srcAddress1 string, dstAddress1 string, srcAddress2 string
 //Tool ofr slowing down latencies: https://bencane.com/2012/07/16/tc-adding-simulated-network-latency-to-your-linux-server/
 func TestCompareLatenciesToPings(t *testing.T) {
 
+	rand.New(nil)
 	log.LLvl1("Make chain")
 	nodes, chain, err := constructBlocks()
 
 	require.NoError(t, err)
 
-	latency0, latency1, err := InterAddressPing(
+	latency0, err := InterAddressPing(
 		nodes[0].SendingAddress.NetworkAddress(),
 		nodes[1].ID.ServerID.Address.NetworkAddress(),
 		nodes[1].SendingAddress.NetworkAddress(),
 		nodes[0].ID.ServerID.Address.NetworkAddress())
+	require.NoError(t, err)
+
+	latency1, err :=
+		InterAddressPing(
+			nodes[1].SendingAddress.NetworkAddress(),
+			nodes[0].ID.ServerID.Address.NetworkAddress(),
+			nodes[0].SendingAddress.NetworkAddress(),
+			nodes[1].ID.ServerID.Address.NetworkAddress())
 	require.NoError(t, err)
 
 	expectedConfLat0, lat0here := chain.Blocks[1].Latencies[string(nodes[1].ID.PublicKey)]
@@ -147,12 +155,12 @@ func TestCompareLatenciesToPings(t *testing.T) {
 	require.True(t, lat0here, "Expected latency 1 not found")
 	require.True(t, lat1here, "Expected latency 2 not found")
 
-	log.LLvl1("Expected 1: " + expectedLat0.String())
-	log.LLvl1("Actual 1: " + latency0.String())
+	log.LLvl1("Block latency 1: " + expectedLat0.String())
+	log.LLvl1("Ping latency 1: " + latency0.String())
 	log.LLvl1("Difference: " + (expectedLat0 - latency0).String())
 
-	log.LLvl1("Expected 2: " + expectedLat1.String())
-	log.LLvl1("Actual 2: " + latency1.String())
+	log.LLvl1("Block latency 2: " + expectedLat1.String())
+	log.LLvl1("Ping latency 2: " + latency1.String())
 	log.LLvl1("Difference: " + (expectedLat1 - latency1).String())
 
 	require.True(t, (expectedLat0-latency0) < benchmarkDelta && (latency0-expectedLat0) < benchmarkDelta)

@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const checkForStopSignal = time.Duration(7 * time.Millisecond)
+
 //PingMsg represents a message sent to another validator
 type PingMsg struct {
 	Src       network.ServerIdentity
@@ -40,11 +42,14 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 	log.LLvl1("Open connection")
 	connection, err := net.ListenUDP("udp", nodeAddress)
 	if err != nil {
+		log.Warn(err)
+		wg.Done()
 		return
 	}
 	defer connection.Close()
 
 	ready <- true
+	log.LLvl1("Start listening")
 	for {
 		select {
 		case <-finish:
@@ -53,20 +58,19 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 			wg.Done()
 			return
 		default:
-			inputBytes := make([]byte, 100000)
-			connection.SetReadDeadline(time.Now().Add(5 * time.Millisecond))
+			inputBytes := make([]byte, 1024)
+			connection.SetReadDeadline(time.Now().Add(checkForStopSignal))
 			len, _, err := connection.ReadFrom(inputBytes)
 			if err != nil && !strings.Contains(err.Error(), "i/o timeout") {
-				log.LLvl1(err)
+				log.Warn(err)
 			}
 			if len > 0 {
 				log.LLvl1("Received message")
 				var msg PingMsg
 				err = protobuf.Decode(inputBytes, &msg)
 				if err != nil {
-					log.LLvl1(err)
+					log.Warn(err)
 				}
-				log.LLvl1("Received message from " + msg.Src.Address.String())
 				receive <- msg
 			}
 		}
