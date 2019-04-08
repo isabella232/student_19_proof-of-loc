@@ -1,7 +1,7 @@
 package latencyprotocol
 
 import (
-	"github.com/dedis/student_19_proof-of-loc/blssig/udp"
+	"github.com/dedis/student_19_proof-of-loc/knowthyneighbor/udp"
 	"go.dedis.ch/onet/v3/network"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"time"

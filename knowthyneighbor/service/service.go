@@ -4,8 +4,8 @@ package service
 import (
 	"crypto/sha256"
 	"errors"
-	"github.com/dedis/student_19_proof-of-loc/blssig/blscosiprotocol"
-	"github.com/dedis/student_19_proof-of-loc/blssig/latencyprotocol"
+	"github.com/dedis/student_19_proof-of-loc/knowthyneighbor/blscosiprotocol"
+	"github.com/dedis/student_19_proof-of-loc/knowthyneighbor/latencyprotocol"
 	uuid "github.com/satori/go.uuid"
 	"go.dedis.ch/cothority/v3/messaging"
 	"go.dedis.ch/kyber/v3/pairing"

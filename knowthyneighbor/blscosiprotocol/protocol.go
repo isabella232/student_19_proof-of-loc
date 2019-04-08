@@ -2,7 +2,7 @@ package blscosiprotocol
 
 import (
 	"errors"
-	"github.com/dedis/student_19_proof-of-loc/blssig/latencyprotocol"
+	"github.com/dedis/student_19_proof-of-loc/knowthyneighbor/latencyprotocol"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/kyber/v3/sign/bls"
 	"go.dedis.ch/onet/v3"
