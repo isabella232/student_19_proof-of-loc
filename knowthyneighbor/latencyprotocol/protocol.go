@@ -12,12 +12,13 @@ import (
 const nbLatencies = 5
 
 //NewNode creates a new Node, initializes a new Block for the chain, and gets latencies for it
-func NewNode(id *network.ServerIdentity, sendingAddress network.Address, suite *pairing.SuiteBn256, nbLatencies int) (*Node, chan bool, error) {
+func NewNode(id *network.ServerIdentity, sendingAddress network.Address,
+	suite *pairing.SuiteBn256, nbLatencies int) (*Node, chan bool, *sync.WaitGroup, error) {
 
 	log.LLvl1("Creating new node")
 	pubKey, privKey, err := sigAlg.GenerateKey(nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	nodeID := &NodeID{id, pubKey}
@@ -61,7 +62,7 @@ func NewNode(id *network.ServerIdentity, sendingAddress network.Address, suite *
 	wg.Add(1)
 	go handleIncomingMessages(newNode, nbLatencies, finishHandling, &wg)
 
-	return newNode, finish, nil
+	return newNode, finish, &wg, nil
 
 }
 

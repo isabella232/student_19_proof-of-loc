@@ -51,6 +51,7 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 
 	ready <- true
 	log.LLvl3("Start listening")
+	inputBytes := make([]byte, readMessageSize)
 	for {
 		select {
 		case <-finish:
@@ -59,7 +60,6 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 			wg.Done()
 			return
 		default:
-			inputBytes := make([]byte, readMessageSize)
 			connection.SetReadDeadline(time.Now().Add(checkForStopSignal))
 			len, _, err := connection.ReadFrom(inputBytes)
 			if err != nil && !strings.Contains(err.Error(), "i/o timeout") {
@@ -73,6 +73,7 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 					log.Warn(err)
 				}
 				receive <- msg
+				inputBytes = make([]byte, readMessageSize)
 			}
 		}
 	}

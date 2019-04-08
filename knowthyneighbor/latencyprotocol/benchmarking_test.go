@@ -26,14 +26,14 @@ func constructBlocks() ([]*Node, *Chain, error) {
 
 	chain := &Chain{make([]*Block, 0), []byte("testBucket")}
 
-	newNode1, finish1, err := NewNode(el.List[0], el.List[1].Address, tSuite, 1)
+	newNode1, finish1, wg1, err := NewNode(el.List[0], el.List[1].Address, tSuite, 1)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	chain.Blocks = append(chain.Blocks, &Block{newNode1.ID, make(map[string]ConfirmedLatency, 0)})
 
-	newNode2, finish2, err := NewNode(el.List[2], el.List[3].Address, tSuite, 1)
+	newNode2, finish2, wg2, err := NewNode(el.List[2], el.List[3].Address, tSuite, 1)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -45,6 +45,7 @@ func constructBlocks() ([]*Node, *Chain, error) {
 	log.LLvl1("Channel 1 got its block")
 
 	finish1 <- true
+	wg1.Wait()
 
 	if len(block1.Latencies) == 0 {
 		return nil, nil, errors.New("Block 2 did not collect any latencies")
@@ -58,14 +59,13 @@ func constructBlocks() ([]*Node, *Chain, error) {
 	log.LLvl1("Channel 2 got its block")
 
 	finish2 <- true
+	wg2.Wait()
 
 	if len(block2.Latencies) == 0 {
 		return nil, nil, errors.New("Block 2 did not collect any latencies")
 	}
 
 	chain.Blocks = append(chain.Blocks, &block2)
-
-	log.LLvl1(len(chain.Blocks))
 
 	log.LLvl1("Storing nodes")
 	nodes := make([]*Node, 2)
@@ -130,6 +130,8 @@ func InterAddressPing(src *network.ServerIdentity, dst *network.ServerIdentity,
 	wg1.Wait()
 	wg2.Wait()
 
+	log.LLvl1("Both routines stopped")
+
 	return endTime1.Sub(startTime1), nil
 
 }
@@ -138,7 +140,7 @@ func InterAddressPing(src *network.ServerIdentity, dst *network.ServerIdentity,
 //Tool for slowing down latencies: https://bencane.com/2012/07/16/tc-adding-simulated-network-latency-to-your-linux-server/
 func TestCompareLatenciesToPings(t *testing.T) {
 
-	NbIterations := 10
+	NbIterations := 1
 
 	block1Latencies := make([]time.Duration, 10)
 	block2Latencies := make([]time.Duration, 10)

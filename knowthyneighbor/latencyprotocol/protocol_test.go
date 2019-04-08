@@ -24,9 +24,10 @@ func TestNewNodeCreation(t *testing.T) {
 	defer local.CloseAll()
 
 	log.LLvl1("Calling NewNode")
-	newNode, finish, err := NewNode(el.List[0], el.List[1].Address, tSuite, 2)
+	newNode, finish, wg, err := NewNode(el.List[0], el.List[1].Address, tSuite, 2)
 
 	finish <- true
+	wg.Wait()
 
 	log.LLvl1("Made new node")
 
@@ -46,12 +47,12 @@ func TestAddBlock(t *testing.T) {
 
 	chain := &Chain{make([]*Block, 1), []byte("testBucket")}
 
-	newNode1, finish1, err := NewNode(el.List[0], el.List[1].Address, tSuite, 1)
+	newNode1, finish1, wg1, err := NewNode(el.List[0], el.List[1].Address, tSuite, 1)
 	require.NoError(t, err)
 
 	chain.Blocks[0] = &Block{newNode1.ID, make(map[string]ConfirmedLatency, 0)}
 
-	newNode2, finish2, err := NewNode(el.List[2], el.List[3].Address, tSuite, 1)
+	newNode2, finish2, wg2, err := NewNode(el.List[2], el.List[3].Address, tSuite, 1)
 
 	require.NoError(t, err)
 
@@ -62,12 +63,14 @@ func TestAddBlock(t *testing.T) {
 	log.LLvl1("Channel 1 got its block")
 
 	finish1 <- true
+	wg1.Wait()
 
 	block2 := <-newNode2.BlockChannel
 
 	log.LLvl1("Channel 2 got its block")
 
 	finish2 <- true
+	wg2.Wait()
 
 	require.NotNil(t, block1, "Nil block")
 	require.NotNil(t, block2, "Nil block")
