@@ -1,4 +1,4 @@
-module github.com/dedis/student_19_proof-of-loc/blssig
+module github.com/dedis/student_19_proof-of-loc/knowthyneighbor
 
 require (
 	github.com/satori/go.uuid v1.2.0

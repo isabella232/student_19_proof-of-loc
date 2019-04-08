@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
+	"go.dedis.ch/onet/v3/network"
+	//sigAlg "golang.org/x/crypto/ed25519"
 	"math/rand"
 	"sync"
 	"testing"
@@ -74,7 +76,8 @@ func constructBlocks() ([]*Node, *Chain, error) {
 
 }
 
-func InterAddressPing(srcAddress1 string, dstAddress1 string, srcAddress2 string, dstAddress2 string) (time.Duration, error) {
+func InterAddressPing(src *network.ServerIdentity, dst *network.ServerIdentity,
+	srcAddress1 string, dstAddress1 string, srcAddress2 string, dstAddress2 string) (time.Duration, error) {
 
 	var wg1 sync.WaitGroup
 	var wg2 sync.WaitGroup
@@ -88,6 +91,16 @@ func InterAddressPing(srcAddress1 string, dstAddress1 string, srcAddress2 string
 
 	<-readyToListenChannel1
 	<-readyToListenChannel2
+
+	/*pubKey, _, _ := sigAlg.GenerateKey(nil)
+
+	msg := udp.PingMsg{
+	Src:             *src,
+	Dst:             *dst,
+	SeqNb:           0,
+	PublicKey:       pubKey,
+	UnsignedContent: nil,
+	SignedContent:   nil}*/
 
 	msg := udp.PingMsg{}
 
@@ -146,6 +159,8 @@ func TestCompareLatenciesToPings(t *testing.T) {
 		require.NoError(t, err)
 
 		latency0, err := InterAddressPing(
+			nodes[0].ID.ServerID,
+			nodes[1].ID.ServerID,
 			nodes[0].SendingAddress.NetworkAddress(),
 			nodes[1].ID.ServerID.Address.NetworkAddress(),
 			nodes[1].SendingAddress.NetworkAddress(),
@@ -154,6 +169,8 @@ func TestCompareLatenciesToPings(t *testing.T) {
 
 		latency1, err :=
 			InterAddressPing(
+				nodes[1].ID.ServerID,
+				nodes[0].ID.ServerID,
 				nodes[1].SendingAddress.NetworkAddress(),
 				nodes[0].ID.ServerID.Address.NetworkAddress(),
 				nodes[0].SendingAddress.NetworkAddress(),
