@@ -40,6 +40,7 @@ func TestNewNodeCreation(t *testing.T) {
 func TestAddBlock(t *testing.T) {
 
 	local := onet.NewTCPTest(tSuite)
+	local.Check = onet.CheckNone
 	// generate 3 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
 	_, el, _ := local.GenTree(4, false)

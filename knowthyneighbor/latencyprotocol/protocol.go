@@ -189,10 +189,6 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 
 					}
 				}
-			default:
-				//log.LLvl1("Incorrect message id")
-				//log.LLvl1(msgSeqNb)
-				//return
 			}
 		}
 

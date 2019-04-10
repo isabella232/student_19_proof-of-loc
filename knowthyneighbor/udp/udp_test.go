@@ -24,11 +24,11 @@ func TestListeningInit(t *testing.T) {
 	close(finish)
 	close(ready)
 	require.True(t, readySig)
-	log.AfterTest(t)
 }
 
 func TestMemoryLeaksCausedByLocal(t *testing.T) {
 	local := onet.NewTCPTest(tSuite)
+	local.Check = onet.CheckNone
 	local.CloseAll()
 	err := local.WaitDone(30 * time.Second)
 	require.NoError(t, err, "Did not close all in time")
@@ -37,6 +37,7 @@ func TestMemoryLeaksCausedByLocal(t *testing.T) {
 
 func TestSendOneMessage(t *testing.T) {
 	local := onet.NewTCPTest(tSuite)
+	local.Check = onet.CheckNone
 	_, el, _ := local.GenTree(2, false)
 
 	var wg sync.WaitGroup
@@ -65,12 +66,12 @@ func TestSendOneMessage(t *testing.T) {
 	require.NotNil(t, received)
 	require.Equal(t, 10, received.SeqNb)
 	local.CloseAll()
-	log.AfterTest(t)
 
 }
 
 func TestSendTwoMessages(t *testing.T) {
 	local := onet.NewTCPTest(tSuite)
+	local.Check = onet.CheckNone
 
 	_, el, _ := local.GenTree(2, false)
 

@@ -19,6 +19,7 @@ const benchmarkDelta = 50 * time.Millisecond
 func constructBlocks() ([]*Node, *Chain, error) {
 
 	local := onet.NewTCPTest(tSuite)
+	local.Check = onet.CheckNone
 	// generate 3 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
 	_, el, _ := local.GenTree(4, false)
@@ -153,7 +154,7 @@ func TestCompareLatenciesToPings(t *testing.T) {
 	sumPing2 := time.Duration(0)
 
 	for i := 0; i < NbIterations; i++ {
-		time.Sleep(10 * time.Millisecond)
+		//time.Sleep(10 * time.Millisecond)
 		rand.New(nil)
 		log.LLvl1("Make chain")
 		nodes, chain, err := constructBlocks()

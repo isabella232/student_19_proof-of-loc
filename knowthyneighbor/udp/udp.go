@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const checkForStopSignal = time.Duration(7 * time.Millisecond)
+const checkForStopSignal = time.Duration(50 * time.Microsecond)
 const readMessageSize = 1024
 
 //PingMsg represents a message sent to another validator
