@@ -18,18 +18,16 @@ func TestMain(m *testing.M) {
 func TestNewNodeCreation(t *testing.T) {
 
 	local := onet.NewTCPTest(tSuite)
+	local.Check = onet.CheckNone
 	// generate 3 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
 	_, el, _ := local.GenTree(2, false)
 	defer local.CloseAll()
 
-	log.LLvl1("Calling NewNode")
 	newNode, finish, wg, err := NewNode(el.List[0], el.List[1].Address, tSuite, 2)
 
 	finish <- true
 	wg.Wait()
-
-	log.LLvl1("Made new node")
 
 	require.NoError(t, err)
 	require.NotNil(t, newNode)
@@ -61,14 +59,10 @@ func TestAddBlock(t *testing.T) {
 
 	block1 := <-newNode1.BlockChannel
 
-	log.LLvl1("Channel 1 got its block")
-
 	finish1 <- true
 	wg1.Wait()
 
 	block2 := <-newNode2.BlockChannel
-
-	log.LLvl1("Channel 2 got its block")
 
 	finish2 <- true
 	wg2.Wait()

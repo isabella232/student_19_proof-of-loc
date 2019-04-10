@@ -29,6 +29,7 @@ of randomness that nodes use. Check the results by varying the number x and the 
 
 func initChain(N int, x int, src sourceType) *Chain {
 	local := onet.NewTCPTest(distanceSuite)
+	local.Check = onet.CheckNone
 	_, el, _ := local.GenTree(N, false)
 	defer local.CloseAll()
 

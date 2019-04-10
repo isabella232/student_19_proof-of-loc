@@ -22,6 +22,7 @@ func TestSignatureRequestService(t *testing.T) {
 	var err error
 
 	local := onet.NewTCPTest(tSuite)
+	local.Check = onet.CheckNone
 	// generate 3 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
 	hosts, el, _ := local.GenTree(3, false)
@@ -58,6 +59,7 @@ func TestSignatureRequestApi(t *testing.T) {
 
 	//log.SetDebugVisible(1)
 	local := onet.NewTCPTest(tSuite)
+	local.Check = onet.CheckNone
 	// generate 5 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
 
@@ -93,6 +95,7 @@ func TestSignatureRequestApi(t *testing.T) {
 func TestNewNodeService(t *testing.T) {
 
 	local := onet.NewTCPTest(tSuite)
+	local.Check = onet.CheckNone
 	// generate 3 hosts, they don't connect, they process messages, and they
 	// don't register the tree or entitylist
 	hosts, el, _ := local.GenTree(3, false)

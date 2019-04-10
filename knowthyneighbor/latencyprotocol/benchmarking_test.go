@@ -143,10 +143,10 @@ func TestCompareLatenciesToPings(t *testing.T) {
 
 	NbIterations := 1
 
-	block1Latencies := make([]time.Duration, 10)
-	block2Latencies := make([]time.Duration, 10)
-	ping1Latencies := make([]time.Duration, 10)
-	ping2Latencies := make([]time.Duration, 10)
+	block1Latencies := make([]time.Duration, NbIterations)
+	block2Latencies := make([]time.Duration, NbIterations)
+	ping1Latencies := make([]time.Duration, NbIterations)
+	ping2Latencies := make([]time.Duration, NbIterations)
 
 	sumBlock1 := time.Duration(0)
 	sumBlock2 := time.Duration(0)

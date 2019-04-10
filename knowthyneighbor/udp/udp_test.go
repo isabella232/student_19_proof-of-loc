@@ -4,7 +4,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
-	"go.dedis.ch/onet/v3/log"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"sync"
 	"testing"
@@ -32,7 +31,6 @@ func TestMemoryLeaksCausedByLocal(t *testing.T) {
 	local.CloseAll()
 	err := local.WaitDone(30 * time.Second)
 	require.NoError(t, err, "Did not close all in time")
-	log.LLvl1("Closed all in time")
 }
 
 func TestSendOneMessage(t *testing.T) {
@@ -56,7 +54,6 @@ func TestSendOneMessage(t *testing.T) {
 
 	require.NoError(t, err)
 	received := <-receptionChannel
-	log.LLvl1("Got message")
 	finish <- true
 	wg.Wait()
 
@@ -95,7 +92,6 @@ func TestSendTwoMessages(t *testing.T) {
 
 	require.NoError(t, err)
 	received1 := <-receptionChannel
-	log.LLvl1("Got message 1")
 
 	require.NotNil(t, received1)
 	require.Equal(t, 10, received1.SeqNb)
@@ -103,7 +99,6 @@ func TestSendTwoMessages(t *testing.T) {
 	err = SendMessage(msg2, srcAddress, dstAddress)
 	require.NoError(t, err)
 	received2 := <-receptionChannel
-	log.LLvl1("Got message 2")
 
 	finish <- true
 	wg.Wait()
@@ -112,6 +107,5 @@ func TestSendTwoMessages(t *testing.T) {
 	require.Equal(t, 11, received2.SeqNb)
 
 	local.CloseAll()
-	log.AfterTest(t)
 
 }

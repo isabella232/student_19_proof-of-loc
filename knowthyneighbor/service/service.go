@@ -144,7 +144,7 @@ func (s *BLSCoSiService) sign(Roster *onet.Roster, Message []byte) ([]byte, []by
 func (s *BLSCoSiService) CreateNode(request *CreateNodeRequest) (*CreateNodeResponse, error) {
 	id := request.ID
 
-	newNode, shutdownChannel, err := latencyprotocol.NewNode(id, request.sendingAddress, s.Suite, request.nbLatenciesNeededForBlock)
+	newNode, shutdownChannel, _, err := latencyprotocol.NewNode(id, request.sendingAddress, s.Suite, request.nbLatenciesNeededForBlock)
 
 	if err != nil {
 		if shutdownChannel != nil {

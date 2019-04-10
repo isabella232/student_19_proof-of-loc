@@ -15,7 +15,7 @@ const nbLatencies = 5
 func NewNode(id *network.ServerIdentity, sendingAddress network.Address,
 	suite *pairing.SuiteBn256, nbLatencies int) (*Node, chan bool, *sync.WaitGroup, error) {
 
-	log.LLvl1("Creating new node")
+	//this is what takes time
 	pubKey, privKey, err := sigAlg.GenerateKey(nil)
 	if err != nil {
 		return nil, nil, nil, err
@@ -70,12 +70,10 @@ func passOnEndSignal(src chan bool, dst1 chan bool, dst2 chan bool, wg *sync.Wai
 	for {
 		select {
 		case <-src:
-			log.LLvl1("Passing on end signal")
 			dst1 <- true
 			dst2 <- true
 			wg.Done()
 			return
-		default:
 		}
 	}
 }
@@ -84,7 +82,6 @@ func passOnEndSignal(src chan bool, dst1 chan bool, dst2 chan bool, wg *sync.Wai
 func (Node *Node) AddBlock(chain *Chain) {
 
 	// send pings
-	log.LLvl1("Adding Block")
 	nbLatenciesNeeded := min(nbLatencies, len(chain.Blocks))
 
 	//for now just ping the first ones
@@ -113,7 +110,6 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 
 			switch msgSeqNb {
 			case 1:
-				log.LLvl1("Incoming message 1")
 				msgContent, messageOkay := Node.checkMessage1(&newMsg)
 				if messageOkay {
 					//Node.BlockSkeleton.ID = &NodeID{&newMsg.Src, newMsg.PublicKey}
@@ -125,7 +121,6 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 					}
 				}
 			case 2:
-				log.LLvl1("Incoming message 2")
 				msgContent, messageOkay := Node.checkMessage2(&newMsg)
 				if messageOkay {
 					err := Node.sendMessage3(&newMsg, msgContent)
@@ -136,7 +131,6 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 
 				}
 			case 3:
-				log.LLvl1("Incoming message 3")
 				msgContent, messageOkay := Node.checkMessage3(&newMsg)
 				if messageOkay {
 					err := Node.sendMessage4(&newMsg, msgContent)
@@ -146,7 +140,6 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 					}
 				}
 			case 4:
-				log.LLvl1("Incoming message 4")
 				msgContent, messageOkay := Node.checkMessage4(&newMsg)
 				if messageOkay {
 					confirmedLatency, err := Node.sendMessage5(&newMsg, msgContent)
@@ -154,7 +147,6 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 					if err != nil {
 						log.Warn(err.Error() + " - Could not send final message: latency will not be recorded")
 					} else {
-						log.LLvl1("Adding new latency to block")
 						encodedKey := string(newMsg.PublicKey)
 						Node.BlockSkeleton.Latencies[encodedKey] = *confirmedLatency //signature content, not whole message
 						Node.NbLatenciesRefreshed++
@@ -163,7 +155,6 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 					Node.LatenciesInConstruction[encodedKey] = nil
 
 					if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock && nbLatenciesForNewBlock > 0 {
-						log.LLvl1("Sending up new block")
 						Node.BlockChannel <- *Node.BlockSkeleton
 						Node.BlockSkeleton.Latencies = make(map[string]ConfirmedLatency)
 
@@ -171,11 +162,8 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 				}
 
 			case 5:
-				log.LLvl1("Incoming message 5")
 				doubleSignedLatency, messageOkay := Node.checkMessage5(&newMsg)
 				if messageOkay {
-
-					log.LLvl1("Adding new latency to block")
 					encodedKey := string(newMsg.PublicKey)
 					Node.BlockSkeleton.Latencies[encodedKey] = *doubleSignedLatency
 					//get rid of contructor
@@ -183,7 +171,6 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 					Node.NbLatenciesRefreshed++
 
 					if Node.NbLatenciesRefreshed >= nbLatenciesForNewBlock && nbLatenciesForNewBlock > 0 {
-						log.LLvl1("Sending up new block")
 						Node.BlockChannel <- *Node.BlockSkeleton
 						Node.BlockSkeleton.Latencies = make(map[string]ConfirmedLatency)
 
