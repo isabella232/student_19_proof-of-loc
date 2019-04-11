@@ -2,6 +2,7 @@ package latencyprotocol
 
 import (
 	"errors"
+	"go.dedis.ch/onet/v3/log"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"strconv"
 	"time"
@@ -151,6 +152,7 @@ func Pythagoras(p1 time.Duration, p2 time.Duration) time.Duration {
 }
 
 func (A *Block) getLatency(B *Block) (time.Duration, bool) {
+	log.LLvl1(B)
 	key := string(B.ID.PublicKey)
 	latencyStruct, isPresent := A.Latencies[key]
 	if !isPresent {
@@ -247,6 +249,7 @@ func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int)
 
 	for _, BBlock := range chain.Blocks {
 		B := BBlock.ID
+		log.LLvl1(B)
 		idConstructor[string(B.PublicKey)] = B
 		for Cstring, BtoCSigned := range BBlock.Latencies {
 			BtoC := BtoCSigned.Latency
@@ -257,6 +260,7 @@ func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int)
 			CtoB, _ := CBlock.getLatency(BBlock)
 
 			if !acceptableDifference(CtoB, BtoC, delta) || !triangleInequality(AtoB, AtoC, BtoC) {
+
 				suspicious[string(B.PublicKey)]++
 				suspicious[string(CBlock.ID.PublicKey)]++
 			}
@@ -281,7 +285,7 @@ func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int)
 
 // a+b>c, a+c>b, b+c > a
 func triangleInequality(latAB time.Duration, latBC time.Duration, latCA time.Duration) bool {
-	return latAB+latBC > latCA && latAB+latCA > latBC && latBC+latCA > latAB
+	return latAB+latBC >= latCA && latAB+latCA >= latBC && latBC+latCA >= latAB
 }
 
 func acceptableDifference(time1 time.Duration, time2 time.Duration, delta time.Duration) bool {

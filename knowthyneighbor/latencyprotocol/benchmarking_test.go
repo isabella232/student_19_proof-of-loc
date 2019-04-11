@@ -141,7 +141,7 @@ func InterAddressPing(src *network.ServerIdentity, dst *network.ServerIdentity,
 //Tool for slowing down latencies: https://bencane.com/2012/07/16/tc-adding-simulated-network-latency-to-your-linux-server/
 func TestCompareLatenciesToPings(t *testing.T) {
 
-	NbIterations := 1
+	NbIterations := 5
 
 	block1Latencies := make([]time.Duration, NbIterations)
 	block2Latencies := make([]time.Duration, NbIterations)

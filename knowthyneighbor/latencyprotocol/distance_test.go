@@ -7,6 +7,7 @@ import (
 	"go.dedis.ch/onet/v3/log"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"math/rand"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -27,7 +28,7 @@ all nodes are honest, each node adds in the blockchain x distances from itself t
 where these x nodes are randomly chosen. You can assume for now that there’s a publicly known source
 of randomness that nodes use. Check the results by varying the number x and the total number of nodes N.*/
 
-func initChain(N int, x int, src sourceType) *Chain {
+func initChain(N int, x int, src sourceType) (*Chain, []*NodeID) {
 	local := onet.NewTCPTest(distanceSuite)
 	local.Check = onet.CheckNone
 	_, el, _ := local.GenTree(N, false)
@@ -39,7 +40,7 @@ func initChain(N int, x int, src sourceType) *Chain {
 	for h := 0; h < N; h++ {
 		pub, priv, err := sigAlg.GenerateKey(nil)
 		if err != nil {
-			return nil
+			return nil, nil
 		}
 		nodeIDs[h] = &NodeID{el.List[h], pub}
 		privateKeys[h] = priv
@@ -91,7 +92,7 @@ func initChain(N int, x int, src sourceType) *Chain {
 		chain.Blocks = append(chain.Blocks, &Block{nodeIDs[i], latencies})
 	}
 
-	return &chain
+	return &chain, nodeIDs
 
 }
 
@@ -100,7 +101,7 @@ func TestApproximateDistanceAllInformation(t *testing.T) {
 	N := 3
 	x := 2
 
-	chain := initChain(N, x, accurate)
+	chain, _ := initChain(N, x, accurate)
 
 	_, exists := chain.Blocks[0].Latencies[string(chain.Blocks[1].ID.PublicKey)]
 
@@ -131,7 +132,7 @@ func TestApproximateDistanceInaccurateInformation(t *testing.T) {
 	N := 6
 	x := 4
 
-	chain := initChain(N, x, inaccurate)
+	chain, _ := initChain(N, x, inaccurate)
 
 	_, isValid, err := chain.Blocks[0].ApproximateDistance(chain.Blocks[1], chain.Blocks[2], 0)
 
@@ -159,7 +160,7 @@ func TestApproximateDistanceIncompleteInformation(t *testing.T) {
 	expectedD02 := time.Duration(((2 * 10000) + 1))
 	expectedD12 := Pythagoras(expectedD01, expectedD02)
 
-	chain := initChain(N, x, inaccurate)
+	chain, _ := initChain(N, x, inaccurate)
 
 	d01, isValid01, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[0], chain.Blocks[1], 10000)
 
@@ -185,11 +186,222 @@ func TestApproximateDistanceMissingInformation(t *testing.T) {
 	N := 5
 	x := 1
 
-	chain := initChain(N, x, accurate)
+	chain, _ := initChain(N, x, accurate)
 
 	_, isValid, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[3], chain.Blocks[4], 0)
 
 	require.NotNil(t, err, "Should not have sufficient information to approximate distance")
 	require.False(t, isValid)
 
+}
+
+func TestBlacklistOnAccurateChainEmpty(t *testing.T) {
+
+	N := 4
+	x := 4
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 0
+
+	chain, nodeIDs := initChain(N, x, accurate)
+
+	for _, NodeID := range nodeIDs {
+		node := Node{
+			ID:                      NodeID,
+			SendingAddress:          "address",
+			PrivateKey:              nil,
+			LatenciesInConstruction: nil,
+			BlockSkeleton:           nil,
+			NbLatenciesRefreshed:    0,
+			IncomingMessageChannel:  nil,
+			BlockChannel:            nil,
+		}
+
+		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
+
+		require.NoError(t, err)
+		require.Zero(t, len(blacklist), "Blacklist should be empty")
+
+	}
+}
+
+func TestAllBlacklistsOnInaccurateChainIdentical(t *testing.T) {
+
+	N := 4
+	x := 4
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 0
+
+	blacklists := make([][]sigAlg.PublicKey, N)
+
+	chain, nodeIDs := initChain(N, x, random)
+
+	for index, NodeID := range nodeIDs {
+		node := Node{
+			ID:                      NodeID,
+			SendingAddress:          "address",
+			PrivateKey:              nil,
+			LatenciesInConstruction: nil,
+			BlockSkeleton:           nil,
+			NbLatenciesRefreshed:    0,
+			IncomingMessageChannel:  nil,
+			BlockChannel:            nil,
+		}
+
+		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
+
+		require.NoError(t, err)
+		require.NotZero(t, len(blacklist))
+		blacklists[index] = blacklist
+
+	}
+
+	for _, blacklist := range blacklists {
+		require.True(t, blacklistsEquivalent(blacklist, blacklists[0]))
+		log.LLvl1(len(blacklist))
+	}
+
+}
+
+func TestExactlyOneLiarBlacklisted(t *testing.T) {
+
+	N := 5
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 2
+
+	A := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("A"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(0 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"E": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	B := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("B"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(0 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(15 * time.Nanosecond), nil, time.Now(), nil},
+			"E": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	C := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("B"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(0 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
+			"E": ConfirmedLatency{time.Duration(15 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	D := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("B"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(15 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(0 * time.Nanosecond), nil, time.Now(), nil},
+			"E": ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	E := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("B"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(15 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil},
+			"E": ConfirmedLatency{time.Duration(0 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	chain := &Chain{
+		Blocks:     []*Block{A, B, C, D, E},
+		BucketName: []byte("TestBucket"),
+	}
+
+	blacklists := make([][]sigAlg.PublicKey, N)
+
+	for index, key := range []sigAlg.PublicKey{
+		sigAlg.PublicKey("A"),
+		sigAlg.PublicKey("B"),
+		sigAlg.PublicKey("C"),
+		sigAlg.PublicKey("D"),
+		sigAlg.PublicKey("E")} {
+		node := Node{
+			ID:                      &NodeID{nil, key},
+			SendingAddress:          "address",
+			PrivateKey:              nil,
+			LatenciesInConstruction: nil,
+			BlockSkeleton:           nil,
+			NbLatenciesRefreshed:    0,
+			IncomingMessageChannel:  nil,
+			BlockChannel:            nil,
+		}
+
+		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
+
+		require.NoError(t, err)
+		require.NotZero(t, len(blacklist))
+		blacklists[index] = blacklist
+
+	}
+
+	for _, blacklist := range blacklists {
+		require.True(t, blacklistsEquivalent(blacklist, blacklists[0]))
+		log.LLvl1(len(blacklist))
+	}
+
+}
+
+func blacklistsEquivalent(a, b []sigAlg.PublicKey) bool {
+
+	// If one is nil, the other must also be nil.
+	if (a == nil) != (b == nil) {
+		return false
+	}
+
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if !contains(b, a[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func contains(s []sigAlg.PublicKey, e sigAlg.PublicKey) bool {
+	for _, a := range s {
+		if reflect.DeepEqual(a, e) {
+			return true
+		}
+	}
+	return false
 }
