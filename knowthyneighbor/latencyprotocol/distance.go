@@ -2,7 +2,7 @@ package latencyprotocol
 
 import (
 	"errors"
-	"go.dedis.ch/onet/v3/log"
+	//"go.dedis.ch/onet/v3/log"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"strconv"
 	"time"
@@ -152,7 +152,7 @@ func Pythagoras(p1 time.Duration, p2 time.Duration) time.Duration {
 }
 
 func (A *Block) getLatency(B *Block) (time.Duration, bool) {
-	log.LLvl1(B)
+
 	key := string(B.ID.PublicKey)
 	latencyStruct, isPresent := A.Latencies[key]
 	if !isPresent {
@@ -225,48 +225,62 @@ type nodeTuple struct {
 	B *sigAlg.PublicKey
 }
 
+type triangle struct {
+	A string
+	B string
+	C string
+}
+
 //CreateBlacklist iterates through a chain and for each block checks if the latencies qiven by its node make sense
 // If they do not, the node is added to a blacklist of nodes not to be trusted
 //Warning: for now, this function assumes that all nodes give latencies to all other nodes
 func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int) ([]sigAlg.PublicKey, error) {
 
-	idConstructor := make(map[string]*NodeID)
+	triangles := make([]triangle, 0)
 	blockMapper := make(map[string]*Block)
 	suspicious := make(map[string]int)
 
 	for _, block := range chain.Blocks {
 		blockMapper[string(block.ID.PublicKey)] = block
+		suspicious[string(block.ID.PublicKey)] = 0
 	}
-
-	ABlock := blockMapper[string(A.ID.PublicKey)]
 
 	//for each node B
 	//for each node C
-	/* Check A -> B, A -> C, B -> C and C -> B
+	//for each node D
+	/* Check B -> C, B -> D, C -> D
 	* if triangle of lengths does not result in realistic angles (rule of 3 for triangles),
-	either B or C needs to be blacklisted -> add (B,C) to a "suspicious" list and keep checking B
+	B, C or D needs to be blacklisted -> add (B,C, D) to a "suspicious" list and keep checking B
 	*/
 
 	for _, BBlock := range chain.Blocks {
-		B := BBlock.ID
-		log.LLvl1(B)
-		idConstructor[string(B.PublicKey)] = B
-		for Cstring, BtoCSigned := range BBlock.Latencies {
-			BtoC := BtoCSigned.Latency
-			CBlock := blockMapper[string(Cstring)]
 
-			AtoB, _ := ABlock.getLatency(BBlock)
-			AtoC, _ := ABlock.getLatency(CBlock)
-			CtoB, _ := CBlock.getLatency(BBlock)
+		Bstring := string(BBlock.ID.PublicKey)
 
-			if !acceptableDifference(CtoB, BtoC, delta) || !triangleInequality(AtoB, AtoC, BtoC) {
+		for Cstring := range BBlock.Latencies {
+			if Cstring != Bstring {
+				CBlock := blockMapper[Cstring]
 
-				suspicious[string(B.PublicKey)]++
-				suspicious[string(CBlock.ID.PublicKey)]++
+				for Dstring := range BBlock.Latencies {
+					if Dstring != Cstring && Dstring != Bstring && !triangleAlreadyEvaluated(Bstring, Cstring, Dstring, triangles) {
+						DBlock := blockMapper[Dstring]
+
+						BtoD, _ := BBlock.getLatency(DBlock)
+						BtoC, _ := BBlock.getLatency(CBlock)
+						CtoD, _ := CBlock.getLatency(DBlock)
+
+						if !triangleInequality(BtoD, BtoC, CtoD) {
+
+							suspicious[Bstring]++
+							suspicious[Cstring]++
+							suspicious[Dstring]++
+						}
+
+						triangles = append(triangles, triangle{Bstring, Cstring, Dstring})
+					}
+				}
 			}
-
 		}
-
 	}
 
 	// At the end, go through the "suspicious" list and count the occurrences of each node
@@ -290,4 +304,45 @@ func triangleInequality(latAB time.Duration, latBC time.Duration, latCA time.Dur
 
 func acceptableDifference(time1 time.Duration, time2 time.Duration, delta time.Duration) bool {
 	return time1-time2 < delta && time2-time1 < delta
+}
+
+func triangleAlreadyEvaluated(A string, B string, C string, triangles []triangle) bool {
+	for _, triangle := range triangles {
+		angles := []string{triangle.A, triangle.B, triangle.C}
+		if listsEquivalent(angles, []string{A, B, C}) {
+			return true
+		}
+
+	}
+
+	return false
+}
+
+func listsEquivalent(a, b []string) bool {
+
+	// If one is nil, the other must also be nil.
+	if (a == nil) != (b == nil) {
+		return false
+	}
+
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if !containsString(b, a[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func containsString(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }

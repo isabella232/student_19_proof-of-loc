@@ -255,14 +255,111 @@ func TestAllBlacklistsOnInaccurateChainIdentical(t *testing.T) {
 
 	}
 
-	for _, blacklist := range blacklists {
+	for _, blacklist := range blacklists[1:] {
 		require.True(t, blacklistsEquivalent(blacklist, blacklists[0]))
-		log.LLvl1(len(blacklist))
 	}
 
 }
 
-func TestExactlyOneLiarBlacklisted(t *testing.T) {
+func TestExactlyOneLiarBlacklistedSmall(t *testing.T) {
+
+	// A <-> D does not make sense, not enough info to know who is evil
+
+	N := 4
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 1
+
+	A := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("A"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	B := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("B"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	C := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("C"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	D := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("D"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	chain := &Chain{
+		Blocks:     []*Block{A, B, C, D},
+		BucketName: []byte("TestBucket"),
+	}
+
+	blacklists := make([][]sigAlg.PublicKey, N)
+
+	for index, key := range []sigAlg.PublicKey{
+		sigAlg.PublicKey("A"),
+		sigAlg.PublicKey("B"),
+		sigAlg.PublicKey("C"),
+		sigAlg.PublicKey("D")} {
+		node := Node{
+			ID:                      &NodeID{nil, key},
+			SendingAddress:          "address",
+			PrivateKey:              nil,
+			LatenciesInConstruction: nil,
+			BlockSkeleton:           nil,
+			NbLatenciesRefreshed:    0,
+			IncomingMessageChannel:  nil,
+			BlockChannel:            nil,
+		}
+
+		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
+
+		require.NoError(t, err)
+		require.NotZero(t, len(blacklist))
+		blacklists[index] = blacklist
+
+	}
+
+	firstBlacklist := blacklists[0]
+
+	require.Equal(t, 2, len(firstBlacklist))
+	require.Contains(t, firstBlacklist, sigAlg.PublicKey([]byte("A")), sigAlg.PublicKey([]byte("D")))
+
+	for _, blacklist := range blacklists[1:] {
+		require.True(t, blacklistsEquivalent(blacklist, firstBlacklist))
+	}
+
+}
+
+func TestExactlyOneLiarBlacklistedLarge(t *testing.T) {
 
 	N := 5
 	d := 1 * time.Nanosecond
@@ -274,7 +371,6 @@ func TestExactlyOneLiarBlacklisted(t *testing.T) {
 			PublicKey: sigAlg.PublicKey("A"),
 		},
 		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(0 * time.Nanosecond), nil, time.Now(), nil},
 			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
 			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
 			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
@@ -289,9 +385,8 @@ func TestExactlyOneLiarBlacklisted(t *testing.T) {
 		},
 		Latencies: map[string]ConfirmedLatency{
 			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(0 * time.Nanosecond), nil, time.Now(), nil},
 			"C": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(15 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
 			"E": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
 		},
 	}
@@ -299,27 +394,25 @@ func TestExactlyOneLiarBlacklisted(t *testing.T) {
 	C := &Block{
 		ID: &NodeID{
 			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("B"),
+			PublicKey: sigAlg.PublicKey("C"),
 		},
 		Latencies: map[string]ConfirmedLatency{
 			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
 			"B": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(0 * time.Nanosecond), nil, time.Now(), nil},
 			"D": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"E": ConfirmedLatency{time.Duration(15 * time.Nanosecond), nil, time.Now(), nil},
+			"E": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
 		},
 	}
 
 	D := &Block{
 		ID: &NodeID{
 			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("B"),
+			PublicKey: sigAlg.PublicKey("D"),
 		},
 		Latencies: map[string]ConfirmedLatency{
 			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(15 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
 			"C": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(0 * time.Nanosecond), nil, time.Now(), nil},
 			"E": ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil},
 		},
 	}
@@ -327,14 +420,13 @@ func TestExactlyOneLiarBlacklisted(t *testing.T) {
 	E := &Block{
 		ID: &NodeID{
 			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("B"),
+			PublicKey: sigAlg.PublicKey("E"),
 		},
 		Latencies: map[string]ConfirmedLatency{
 			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
 			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(15 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
 			"D": ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil},
-			"E": ConfirmedLatency{time.Duration(0 * time.Nanosecond), nil, time.Now(), nil},
 		},
 	}
 
@@ -370,9 +462,13 @@ func TestExactlyOneLiarBlacklisted(t *testing.T) {
 
 	}
 
-	for _, blacklist := range blacklists {
-		require.True(t, blacklistsEquivalent(blacklist, blacklists[0]))
-		log.LLvl1(len(blacklist))
+	firstBlacklist := blacklists[0]
+
+	require.Equal(t, 1, len(firstBlacklist))
+	require.Contains(t, firstBlacklist, sigAlg.PublicKey([]byte("C")))
+
+	for _, blacklist := range blacklists[1:] {
+		require.True(t, blacklistsEquivalent(blacklist, firstBlacklist))
 	}
 
 }
