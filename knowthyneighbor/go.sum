@@ -18,6 +18,7 @@ github.com/dedis/student_19_proof-of-loc v0.0.0-20190402144540-baa0973e1721 h1:4
 github.com/dedis/student_19_proof-of-loc v0.0.0-20190408122100-6133e56de7d7 h1:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
 github.com/dedis/student_19_proof-of-loc v0.0.0-20190408141444-ff799f3c9f1e h1:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
 github.com/dedis/student_19_proof-of-loc v0.0.0-20190408145037-02c250223ae7 h1:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
+github.com/dedis/student_19_proof-of-loc v0.0.0-20190408153408-60c331a7dddb h1:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450/go.mod h1:Bk6SMAONeMXrxql8uvOKuAZSu8aM5RUGv+1C6IJaEho=
 github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995/go.mod h1:lJgMEyOkYFkPcDKwRXegd+iM6E7matEszMG5HhwytU8=

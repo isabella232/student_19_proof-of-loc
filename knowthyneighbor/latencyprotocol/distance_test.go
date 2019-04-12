@@ -71,6 +71,7 @@ func initChain(N int, x int, src sourceType) (*Chain, []*NodeID) {
 							nil,
 						}
 				case variant:
+					//adapt to percentage of distance
 					latencies[string(nodeIDs[j].PublicKey)] = ConfirmedLatency{
 						time.Duration(10 * (i + j + 1 + rand.Intn(5))),
 						nil,
@@ -224,7 +225,7 @@ func TestBlacklistOnAccurateChainEmpty(t *testing.T) {
 	}
 }
 
-func TestExactlyOneLiarBlacklistedSmall(t *testing.T) {
+func TestSmallNetworkBlacklist(t *testing.T) {
 
 	// A <-> D does not make sense, not enough info to know who is evil
 

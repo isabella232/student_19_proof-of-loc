@@ -80,6 +80,7 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 	}
 
 	signed := sigAlg.Sign(Node.PrivateKey, unsigned)
+	log.LLvl1("Signing time: " + (time.Now().Sub(timestamp)).String())
 
 	msg := udp.PingMsg{
 		Src:       *Node.ID.ServerID,

@@ -28,7 +28,7 @@ type PingMsg struct {
 
 //InitListening allows the start of listening for pings on the server
 func InitListening(srcAddress string, finish <-chan bool, ready chan<- bool, wg *sync.WaitGroup) chan PingMsg {
-	receive := make(chan PingMsg, 100)
+	receive := make(chan PingMsg, 10)
 	wg.Add(1)
 	go listen(receive, srcAddress, finish, ready, wg)
 	return receive
