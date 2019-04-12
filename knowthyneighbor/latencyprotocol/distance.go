@@ -233,7 +233,9 @@ type triangle struct {
 
 //CreateBlacklist iterates through a chain and for each block checks if the latencies qiven by its node make sense
 // If they do not, the node is added to a blacklist of nodes not to be trusted
-//Warning: for now, this function assumes that all nodes give latencies to all other nodes
+//Warning: for now, the following assumptions are made:
+//* all nodes give latencies to all other nodes (except themselves)
+//* all latencies are symmetric (A -> B == B -> A)
 func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int) ([]sigAlg.PublicKey, error) {
 
 	triangles := make([]triangle, 0)

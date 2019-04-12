@@ -224,43 +224,6 @@ func TestBlacklistOnAccurateChainEmpty(t *testing.T) {
 	}
 }
 
-func TestAllBlacklistsOnInaccurateChainIdentical(t *testing.T) {
-
-	N := 4
-	x := 4
-	d := 1 * time.Nanosecond
-	suspicionThreshold := 0
-
-	blacklists := make([][]sigAlg.PublicKey, N)
-
-	chain, nodeIDs := initChain(N, x, random)
-
-	for index, NodeID := range nodeIDs {
-		node := Node{
-			ID:                      NodeID,
-			SendingAddress:          "address",
-			PrivateKey:              nil,
-			LatenciesInConstruction: nil,
-			BlockSkeleton:           nil,
-			NbLatenciesRefreshed:    0,
-			IncomingMessageChannel:  nil,
-			BlockChannel:            nil,
-		}
-
-		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
-
-		require.NoError(t, err)
-		require.NotZero(t, len(blacklist))
-		blacklists[index] = blacklist
-
-	}
-
-	for _, blacklist := range blacklists[1:] {
-		require.True(t, blacklistsEquivalent(blacklist, blacklists[0]))
-	}
-
-}
-
 func TestExactlyOneLiarBlacklistedSmall(t *testing.T) {
 
 	// A <-> D does not make sense, not enough info to know who is evil
