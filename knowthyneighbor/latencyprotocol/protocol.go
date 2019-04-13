@@ -29,16 +29,14 @@ func NewNode(id *network.ServerIdentity, sendingAddress network.Address,
 	newBlock := &Block{ID: nodeID, Latencies: latencies}
 
 	var wg sync.WaitGroup
-	udpReady := make(chan bool, 1)
 
 	finish := make(chan bool, 1)
-	finishListening := make(chan bool, 1)
 	finishHandling := make(chan bool, 1)
+
+	receiverChannel, finishListening, udpReady := udp.InitListening(id.Address.NetworkAddress(), &wg)
 
 	wg.Add(1)
 	go passOnEndSignal(finish, finishHandling, finishListening, &wg)
-
-	receiverChannel := udp.InitListening(id.Address.NetworkAddress(), finishListening, udpReady, &wg)
 
 	<-udpReady
 
@@ -112,8 +110,6 @@ func handleIncomingMessages(Node *Node, nbLatenciesForNewBlock int, finish chan 
 			case 1:
 				msgContent, messageOkay := Node.checkMessage1(&newMsg)
 				if messageOkay {
-					//Node.BlockSkeleton.ID = &NodeID{&newMsg.Src, newMsg.PublicKey}
-					// TODO what if multiple latencies try to connect to node at same time -> Node needs list of blocks in construction
 					err := Node.sendMessage2(&newMsg, msgContent)
 					if err != nil {
 						log.Warn(err.Error() + " - Could not send message: latency will not be recorded")

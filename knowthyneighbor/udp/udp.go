@@ -27,11 +27,23 @@ type PingMsg struct {
 }
 
 //InitListening allows the start of listening for pings on the server
-func InitListening(srcAddress string, finish <-chan bool, ready chan<- bool, wg *sync.WaitGroup) chan PingMsg {
+func InitListening(srcAddress string, wg *sync.WaitGroup) (chan PingMsg, chan bool, chan bool) {
 	receive := make(chan PingMsg, 10)
+	finish := make(chan bool, 1)
+	ready := make(chan bool, 1)
 	wg.Add(1)
 	go listen(receive, srcAddress, finish, ready, wg)
-	return receive
+	return receive, finish, ready
+}
+
+func stopListening(finish chan bool, connection *net.UDPConn, wg *sync.WaitGroup) {
+	for {
+		select {
+		case <-finish:
+			connection.Close()
+			wg.Done()
+		}
+	}
 }
 
 func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready chan<- bool, wg *sync.WaitGroup) {
@@ -55,7 +67,8 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 			wg.Done()
 			return
 		default:
-			connection.SetReadDeadline(time.Now().Add(checkForStopSignal))
+			//connection.SetReadDeadline(time.Now().Add(checkForStopSignal))
+			connection.Close()
 			len, _, err := connection.ReadFrom(inputBytes)
 			if err != nil && !strings.Contains(err.Error(), "i/o timeout") {
 				log.Warn(err)
@@ -74,8 +87,17 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready c
 	}
 }
 
-//SendMessage lets a server ping another server
-func SendMessage(message PingMsg, srcAddress string, dstAddress string) error {
+//InitSending allows the start of listening for pings on the server
+func InitSending(srcAddress string, dstAddress string, wg *sync.WaitGroup) (chan bool, chan PingMsg) {
+	msgChannel := make(chan PingMsg, 10)
+	finish := make(chan bool, 1)
+	wg.Add(1)
+	go sendMessage(srcAddress, dstAddress, finish, msgChannel, wg)
+	return finish, msgChannel
+}
+
+//sendMessage allows the start of sending between a source and a destination
+func sendMessage(srcAddress string, dstAddress string, finish <-chan bool, msgChannel <-chan PingMsg, wg *sync.WaitGroup) error {
 
 	destinationAddress, _ := net.ResolveUDPAddr("udp", dstAddress)
 	sourceAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
@@ -83,16 +105,23 @@ func SendMessage(message PingMsg, srcAddress string, dstAddress string) error {
 	connection, err := net.DialUDP("udp", sourceAddress, destinationAddress)
 	if err != nil {
 		log.Warn("Could not dial up")
+		wg.Done()
 		return err
 	}
-
-	encoded, err := protobuf.Encode(&message)
-	if err != nil {
-		log.Warn("Could not encode message")
-		connection.Close()
-		return err
+	for {
+		select {
+		case <-finish:
+			connection.Close()
+			wg.Done()
+			return nil
+		case message := <-msgChannel:
+			encoded, err := protobuf.Encode(&message)
+			if err != nil {
+				log.Warn("Could not encode message")
+				connection.Close()
+				return err
+			}
+			connection.Write(encoded)
+		}
 	}
-	connection.Write(encoded)
-	connection.Close()
-	return nil
 }

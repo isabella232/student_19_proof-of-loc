@@ -80,56 +80,34 @@ func constructBlocks() ([]*Node, *Chain, error) {
 func InterAddressPing(src *network.ServerIdentity, dst *network.ServerIdentity,
 	srcAddress1 string, dstAddress1 string, srcAddress2 string, dstAddress2 string) (time.Duration, error) {
 
-	var wg1 sync.WaitGroup
-	var wg2 sync.WaitGroup
-	finishListeningChannel1 := make(chan bool, 1)
-	readyToListenChannel1 := make(chan bool, 1)
-	finishListeningChannel2 := make(chan bool, 1)
-	readyToListenChannel2 := make(chan bool, 1)
+	var wg sync.WaitGroup
 
-	msgChannel1 := udp.InitListening(dstAddress1, finishListeningChannel1, readyToListenChannel1, &wg1)
-	msgChannel2 := udp.InitListening(dstAddress2, finishListeningChannel2, readyToListenChannel2, &wg2)
+	msgChannel1, finishListeningChannel1, readyToListenChannel1 := udp.InitListening(dstAddress1, &wg)
+	msgChannel2, finishListeningChannel2, readyToListenChannel2 := udp.InitListening(dstAddress2, &wg)
 
 	<-readyToListenChannel1
 	<-readyToListenChannel2
 
-	/*pubKey, _, _ := sigAlg.GenerateKey(nil)
-
-	msg := udp.PingMsg{
-	Src:             *src,
-	Dst:             *dst,
-	SeqNb:           0,
-	PublicKey:       pubKey,
-	UnsignedContent: nil,
-	SignedContent:   nil}*/
-
 	msg := udp.PingMsg{}
 
 	startTime1 := time.Now()
-	err := udp.SendMessage(msg, srcAddress1, dstAddress1)
-	if err != nil {
-		finishListeningChannel1 <- true
-		finishListeningChannel2 <- true
-		return 0, err
-	}
+	finishSending1, sendMsgChan1 := udp.InitSending(srcAddress1, dstAddress1, &wg)
+	sendMsgChan1 <- msg
 
 	sentMsg := <-msgChannel1
 
-	err = udp.SendMessage(sentMsg, srcAddress2, dstAddress2)
-	if err != nil {
-		finishListeningChannel1 <- true
-		finishListeningChannel2 <- true
-		return 0, err
-	}
+	finishSending2, sendMsgChan2 := udp.InitSending(srcAddress2, dstAddress2, &wg)
+	sendMsgChan2 <- sentMsg
 
 	<-msgChannel2
 	endTime1 := time.Now()
 
 	finishListeningChannel1 <- true
 	finishListeningChannel2 <- true
+	finishSending1 <- true
+	finishSending2 <- true
 
-	wg1.Wait()
-	wg2.Wait()
+	wg.Wait()
 
 	log.LLvl1("Both routines stopped")
 
@@ -141,7 +119,7 @@ func InterAddressPing(src *network.ServerIdentity, dst *network.ServerIdentity,
 //Tool for slowing down latencies: https://bencane.com/2012/07/16/tc-adding-simulated-network-latency-to-your-linux-server/
 func TestCompareLatenciesToPings(t *testing.T) {
 
-	NbIterations := 10
+	NbIterations := 1
 
 	block1Latencies := make([]time.Duration, NbIterations)
 	block2Latencies := make([]time.Duration, NbIterations)

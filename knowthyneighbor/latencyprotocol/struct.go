@@ -4,6 +4,7 @@ import (
 	"github.com/dedis/student_19_proof-of-loc/knowthyneighbor/udp"
 	"go.dedis.ch/onet/v3/network"
 	sigAlg "golang.org/x/crypto/ed25519"
+	"sync"
 	"time"
 )
 
@@ -64,4 +65,7 @@ type LatencyConstructor struct {
 	ClockSkews        []time.Duration
 	Latency           time.Duration
 	SignedLatency     []byte
+	MsgChannel        chan udp.PingMsg
+	FinishedSending   chan bool
+	WaitGroup         *sync.WaitGroup
 }

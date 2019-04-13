@@ -14,15 +14,20 @@ var tSuite = pairing.NewSuiteBn256()
 
 func TestListeningInit(t *testing.T) {
 	var wg sync.WaitGroup
-	finish := make(chan bool, 1)
-	ready := make(chan bool, 1)
-	InitListening("127.0.0.1:30001", finish, ready, &wg)
+	_, finish, ready := InitListening("127.0.0.1:30001", &wg)
 	readySig := <-ready
 	finish <- true
 	wg.Wait()
 	close(finish)
 	close(ready)
 	require.True(t, readySig)
+}
+
+func TestSendingInit(t *testing.T) {
+	var wg sync.WaitGroup
+	finish, _ := InitSending("127.0.0.1:3001", "127.0.0.1:3002", &wg)
+	finish <- true
+	wg.Wait()
 }
 
 func TestMemoryLeaksCausedByLocal(t *testing.T) {
@@ -39,26 +44,26 @@ func TestSendOneMessage(t *testing.T) {
 	_, el, _ := local.GenTree(2, false)
 
 	var wg sync.WaitGroup
-	finish := make(chan bool, 1)
-	ready := make(chan bool, 1)
 
-	receptionChannel := InitListening(el.List[1].Address.NetworkAddress(), finish, ready, &wg)
+	dstAddress := el.List[0].Address.NetworkAddress()
+	srcAddress := el.List[1].Address.NetworkAddress()
 
-	<-ready
+	receptionChannel, finishListen, readyListen := InitListening(dstAddress, &wg)
+
+	<-readyListen
 
 	pub, _, _ := sigAlg.GenerateKey(nil)
 
 	msg := PingMsg{*el.List[0], *el.List[1], 10, pub, make([]byte, 0), make([]byte, 0)}
 
-	err := SendMessage(msg, el.List[0].Address.NetworkAddress(), el.List[1].Address.NetworkAddress())
+	finishSend, msgSending := InitSending(srcAddress, dstAddress, &wg)
 
-	require.NoError(t, err)
+	msgSending <- msg
+
 	received := <-receptionChannel
-	finish <- true
+	finishListen <- true
+	finishSend <- true
 	wg.Wait()
-
-	close(ready)
-	close(finish)
 
 	require.NotNil(t, received)
 	require.Equal(t, 10, received.SeqNb)
@@ -73,13 +78,11 @@ func TestSendTwoMessages(t *testing.T) {
 	_, el, _ := local.GenTree(2, false)
 
 	var wg sync.WaitGroup
-	finish := make(chan bool, 1)
-	ready := make(chan bool, 1)
 
 	dstAddress := el.List[1].Address.NetworkAddress()
 	srcAddress := el.List[0].Address.NetworkAddress()
 
-	receptionChannel := InitListening(dstAddress, finish, ready, &wg)
+	receptionChannel, finishListen, ready := InitListening(dstAddress, &wg)
 
 	<-ready
 
@@ -88,19 +91,21 @@ func TestSendTwoMessages(t *testing.T) {
 	msg1 := PingMsg{*el.List[0], *el.List[1], 10, pub, make([]byte, 0), make([]byte, 0)}
 	msg2 := PingMsg{*el.List[0], *el.List[1], 11, pub, make([]byte, 0), make([]byte, 0)}
 
-	err := SendMessage(msg1, srcAddress, dstAddress)
+	finishSend, msgSending := InitSending(srcAddress, dstAddress, &wg)
 
-	require.NoError(t, err)
+	msgSending <- msg1
+
 	received1 := <-receptionChannel
 
 	require.NotNil(t, received1)
 	require.Equal(t, 10, received1.SeqNb)
 
-	err = SendMessage(msg2, srcAddress, dstAddress)
-	require.NoError(t, err)
+	msgSending <- msg2
+
 	received2 := <-receptionChannel
 
-	finish <- true
+	finishListen <- true
+	finishSend <- true
 	wg.Wait()
 
 	require.NotNil(t, received2)

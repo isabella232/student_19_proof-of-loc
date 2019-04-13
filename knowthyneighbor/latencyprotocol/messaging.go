@@ -8,6 +8,7 @@ import (
 	sigAlg "golang.org/x/crypto/ed25519"
 	"math"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -95,11 +96,11 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 	srcAddress := Node.SendingAddress.NetworkAddress()
 	dstAddress := dstNodeID.ServerID.Address.NetworkAddress()
 
-	err = udp.SendMessage(msg, srcAddress, dstAddress)
-	if err != nil {
-		log.Warn(err)
-		return err
-	}
+	var wg sync.WaitGroup
+
+	finishedSendingChan, MsgChan := udp.InitSending(srcAddress, dstAddress, &wg)
+
+	MsgChan <- msg
 
 	latConstr := LatencyConstructor{
 		StartedLocally:    true,
@@ -111,6 +112,9 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 		ClockSkews:        make([]time.Duration, 2),
 		Latency:           0,
 		SignedLatency:     nil,
+		MsgChannel:        MsgChan,
+		FinishedSending:   finishedSendingChan,
+		WaitGroup:         &wg,
 	}
 
 	latConstr.LocalTimestamps[0] = timestamp
@@ -187,6 +191,12 @@ func (Node *Node) sendMessage2(msg *udp.PingMsg, msgContent *PingMsg1) error {
 	srcAddress := Node.SendingAddress.NetworkAddress()
 	dstAddress := msg.Src.Address.NetworkAddress()
 
+	var wg sync.WaitGroup
+
+	finishedSendingChan, MsgChan := udp.InitSending(srcAddress, dstAddress, &wg)
+
+	MsgChan <- newMsg
+
 	latencyConstr := LatencyConstructor{
 		StartedLocally:    false,
 		CurrentMsgNb:      2,
@@ -197,6 +207,9 @@ func (Node *Node) sendMessage2(msg *udp.PingMsg, msgContent *PingMsg1) error {
 		ClockSkews:        make([]time.Duration, 2),
 		Latency:           0,
 		SignedLatency:     nil,
+		MsgChannel:        MsgChan,
+		FinishedSending:   finishedSendingChan,
+		WaitGroup:         &wg,
 	}
 
 	encodedKey := string(msg.PublicKey)
@@ -205,13 +218,6 @@ func (Node *Node) sendMessage2(msg *udp.PingMsg, msgContent *PingMsg1) error {
 	latencyConstr.LocalTimestamps[0] = localtime
 	latencyConstr.ForeignTimestamps[0] = msgContent.Timestamp
 	latencyConstr.ClockSkews[0] = localtime.Sub(msgContent.Timestamp)
-
-	//we have to do this after latencyInConstruction creation, else we have concurrency issues
-	err = udp.SendMessage(newMsg, srcAddress, dstAddress)
-	if err != nil {
-		log.Warn(err)
-		return err
-	}
 
 	return nil
 
@@ -307,14 +313,7 @@ func (Node *Node) sendMessage3(msg *udp.PingMsg, msgContent *PingMsg2) error {
 		SignedContent:   signedContent,
 	}
 
-	srcAddress := Node.SendingAddress.NetworkAddress()
-	dstAddress := msg.Src.Address.NetworkAddress()
-
-	err = udp.SendMessage(newMsg, srcAddress, dstAddress)
-	if err != nil {
-		log.Warn(err)
-		return err
-	}
+	latencyConstr.MsgChannel <- newMsg
 
 	latencyConstr.CurrentMsgNb += 2
 	latencyConstr.LocalTimestamps[1] = localtime
@@ -435,19 +434,15 @@ func (Node *Node) sendMessage4(msg *udp.PingMsg, msgContent *PingMsg3) error {
 		SignedContent:   signedContent,
 	}
 
-	srcAddress := Node.SendingAddress.NetworkAddress()
-	dstAddress := msg.Src.Address.NetworkAddress()
-
-	err = udp.SendMessage(newMsg, srcAddress, dstAddress)
-	if err != nil {
-		log.Warn(err)
-		return err
-	}
+	latencyConstr.MsgChannel <- newMsg
+	latencyConstr.FinishedSending <- true
 
 	latencyConstr.Latency = localLatency
 	latencyConstr.LocalTimestamps[1] = localtime
 	latencyConstr.SignedLatency = signedLocalLatency
 	latencyConstr.CurrentMsgNb += 2
+
+	latencyConstr.WaitGroup.Wait()
 
 	return nil
 
@@ -544,10 +539,8 @@ func (Node *Node) sendMessage5(msg *udp.PingMsg, msgContent *PingMsg4) (*Confirm
 		SignedContent:   signedContent,
 	}
 
-	srcAddress := Node.SendingAddress.NetworkAddress()
-	dstAddress := msg.Src.Address.NetworkAddress()
-
-	udp.SendMessage(newMsg, srcAddress, dstAddress)
+	latencyConstr.MsgChannel <- newMsg
+	latencyConstr.FinishedSending <- true
 
 	latencyConstr.CurrentMsgNb += 2
 	latencyConstr.LocalTimestamps[1] = localtime
@@ -558,6 +551,8 @@ func (Node *Node) sendMessage5(msg *udp.PingMsg, msgContent *PingMsg4) (*Confirm
 		Timestamp:          latencyConstr.ForeignTimestamps[1],
 		SignedConfirmation: msgContent.DoubleSignedForeignLatency,
 	}
+
+	latencyConstr.WaitGroup.Wait()
 
 	return newLatency, nil
 
