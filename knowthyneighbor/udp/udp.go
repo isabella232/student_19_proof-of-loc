@@ -45,14 +45,10 @@ func InitListening(srcAddress string, wg *sync.WaitGroup) (chan PingMsg, chan bo
 }
 
 func stopListening(finish chan bool, connection *net.UDPConn, wg *sync.WaitGroup) {
-	for {
-		select {
-		case <-finish:
-			connection.Close()
-			wg.Done()
-			return
-		}
-	}
+	<-finish
+	connection.Close()
+	wg.Done()
+	return
 }
 
 func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, connection *net.UDPConn, wg *sync.WaitGroup) {
@@ -72,9 +68,9 @@ func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, connect
 
 			var msg PingMsg
 			err = protobuf.Decode(inputBytes, &msg)
-			if err != nil {
+			/*if err != nil {
 				log.Warn(err)
-			}
+			}*/
 			receive <- msg
 			inputBytes = make([]byte, readMessageSize)
 		}

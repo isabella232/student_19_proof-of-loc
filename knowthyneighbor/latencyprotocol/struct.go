@@ -65,7 +65,7 @@ type LatencyConstructor struct {
 	ClockSkews        []time.Duration
 	Latency           time.Duration
 	SignedLatency     []byte
-	MsgChannel        chan udp.PingMsg
-	FinishedSending   chan bool
+	MsgChannel        *chan udp.PingMsg
+	FinishedSending   *chan bool
 	WaitGroup         *sync.WaitGroup
 }

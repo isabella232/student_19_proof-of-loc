@@ -67,14 +67,12 @@ func NewNode(id *network.ServerIdentity, sendingAddress network.Address,
 }
 
 func passOnEndSignal(src chan bool, dst1 chan bool, dst2 chan bool, wg *sync.WaitGroup) {
-	for {
-		select {
-		case <-src:
-			dst1 <- true
-			dst2 <- true
-			wg.Done()
-			return
-		}
+	select {
+	case <-src:
+		dst1 <- true
+		dst2 <- true
+		wg.Done()
+		return
 	}
 }
 

@@ -67,6 +67,13 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 		return errors.New("Already started messaging this node")
 	}
 
+	srcAddress := Node.SendingAddress.NetworkAddress()
+	dstAddress := dstNodeID.ServerID.Address.NetworkAddress()
+
+	var wg sync.WaitGroup
+
+	finishedSendingChan, MsgChan := udp.InitSending(srcAddress, dstAddress, &wg)
+
 	timestamp := time.Now()
 
 	msgContent := &PingMsg1{
@@ -81,7 +88,6 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 	}
 
 	signed := sigAlg.Sign(Node.PrivateKey, unsigned)
-	log.LLvl1("Signing time: " + (time.Now().Sub(timestamp)).String())
 
 	msg := udp.PingMsg{
 		Src:       *Node.ID.ServerID,
@@ -92,13 +98,6 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 		UnsignedContent: unsigned,
 		SignedContent:   signed,
 	}
-
-	srcAddress := Node.SendingAddress.NetworkAddress()
-	dstAddress := dstNodeID.ServerID.Address.NetworkAddress()
-
-	var wg sync.WaitGroup
-
-	finishedSendingChan, MsgChan := udp.InitSending(srcAddress, dstAddress, &wg)
 
 	MsgChan <- msg
 
@@ -112,8 +111,8 @@ func (Node *Node) sendMessage1(dstNodeID *NodeID) error {
 		ClockSkews:        make([]time.Duration, 2),
 		Latency:           0,
 		SignedLatency:     nil,
-		MsgChannel:        MsgChan,
-		FinishedSending:   finishedSendingChan,
+		MsgChannel:        &MsgChan,
+		FinishedSending:   &finishedSendingChan,
 		WaitGroup:         &wg,
 	}
 
@@ -160,6 +159,13 @@ func (Node *Node) checkMessage1(msg *udp.PingMsg) (*PingMsg1, bool) {
 
 func (Node *Node) sendMessage2(msg *udp.PingMsg, msgContent *PingMsg1) error {
 
+	srcAddress := Node.SendingAddress.NetworkAddress()
+	dstAddress := msg.Src.Address.NetworkAddress()
+
+	var wg sync.WaitGroup
+
+	finishedSendingChan, MsgChan := udp.InitSending(srcAddress, dstAddress, &wg)
+
 	nonce := Nonce(rand.Intn(math.MaxInt32))
 
 	localtime := time.Now()
@@ -188,13 +194,6 @@ func (Node *Node) sendMessage2(msg *udp.PingMsg, msgContent *PingMsg1) error {
 		SignedContent:   signed,
 	}
 
-	srcAddress := Node.SendingAddress.NetworkAddress()
-	dstAddress := msg.Src.Address.NetworkAddress()
-
-	var wg sync.WaitGroup
-
-	finishedSendingChan, MsgChan := udp.InitSending(srcAddress, dstAddress, &wg)
-
 	MsgChan <- newMsg
 
 	latencyConstr := LatencyConstructor{
@@ -207,8 +206,8 @@ func (Node *Node) sendMessage2(msg *udp.PingMsg, msgContent *PingMsg1) error {
 		ClockSkews:        make([]time.Duration, 2),
 		Latency:           0,
 		SignedLatency:     nil,
-		MsgChannel:        MsgChan,
-		FinishedSending:   finishedSendingChan,
+		MsgChannel:        &MsgChan,
+		FinishedSending:   &finishedSendingChan,
 		WaitGroup:         &wg,
 	}
 
@@ -313,7 +312,7 @@ func (Node *Node) sendMessage3(msg *udp.PingMsg, msgContent *PingMsg2) error {
 		SignedContent:   signedContent,
 	}
 
-	latencyConstr.MsgChannel <- newMsg
+	*latencyConstr.MsgChannel <- newMsg
 
 	latencyConstr.CurrentMsgNb += 2
 	latencyConstr.LocalTimestamps[1] = localtime
@@ -434,8 +433,8 @@ func (Node *Node) sendMessage4(msg *udp.PingMsg, msgContent *PingMsg3) error {
 		SignedContent:   signedContent,
 	}
 
-	latencyConstr.MsgChannel <- newMsg
-	latencyConstr.FinishedSending <- true
+	*latencyConstr.MsgChannel <- newMsg
+	*latencyConstr.FinishedSending <- true
 
 	latencyConstr.Latency = localLatency
 	latencyConstr.LocalTimestamps[1] = localtime
@@ -539,8 +538,8 @@ func (Node *Node) sendMessage5(msg *udp.PingMsg, msgContent *PingMsg4) (*Confirm
 		SignedContent:   signedContent,
 	}
 
-	latencyConstr.MsgChannel <- newMsg
-	latencyConstr.FinishedSending <- true
+	*latencyConstr.MsgChannel <- newMsg
+	*latencyConstr.FinishedSending <- true
 
 	latencyConstr.CurrentMsgNb += 2
 	latencyConstr.LocalTimestamps[1] = localtime
