@@ -33,12 +33,14 @@ func NewNode(id *network.ServerIdentity, sendingAddress network.Address,
 	finish := make(chan bool, 1)
 	finishHandling := make(chan bool, 1)
 
-	receiverChannel, finishListening, udpReady := udp.InitListening(id.Address.NetworkAddress(), &wg)
+	receiverChannel, finishListening, err := udp.InitListening(id.Address.NetworkAddress(), &wg)
+
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	wg.Add(1)
 	go passOnEndSignal(finish, finishHandling, finishListening, &wg)
-
-	<-udpReady
 
 	BlockChannel := make(chan Block, 1)
 

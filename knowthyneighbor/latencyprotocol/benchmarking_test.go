@@ -82,11 +82,14 @@ func InterAddressPing(src *network.ServerIdentity, dst *network.ServerIdentity,
 
 	var wg sync.WaitGroup
 
-	msgChannel1, finishListeningChannel1, readyToListenChannel1 := udp.InitListening(dstAddress1, &wg)
-	msgChannel2, finishListeningChannel2, readyToListenChannel2 := udp.InitListening(dstAddress2, &wg)
-
-	<-readyToListenChannel1
-	<-readyToListenChannel2
+	msgChannel1, finishListeningChannel1, err := udp.InitListening(dstAddress1, &wg)
+	if err != nil {
+		return 0, err
+	}
+	msgChannel2, finishListeningChannel2, err := udp.InitListening(dstAddress2, &wg)
+	if err != nil {
+		return 0, err
+	}
 
 	msg := udp.PingMsg{}
 

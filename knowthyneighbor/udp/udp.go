@@ -27,13 +27,21 @@ type PingMsg struct {
 }
 
 //InitListening allows the start of listening for pings on the server
-func InitListening(srcAddress string, wg *sync.WaitGroup) (chan PingMsg, chan bool, chan bool) {
+func InitListening(srcAddress string, wg *sync.WaitGroup) (chan PingMsg, chan bool, error) {
 	receive := make(chan PingMsg, 10)
 	finish := make(chan bool, 1)
-	ready := make(chan bool, 1)
-	wg.Add(1)
-	go listen(receive, srcAddress, finish, ready, wg)
-	return receive, finish, ready
+
+	nodeAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
+
+	connection, err := net.ListenUDP("udp", nodeAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	wg.Add(2)
+	go stopListening(finish, connection, wg)
+	go listen(receive, srcAddress, finish, connection, wg)
+	return receive, finish, nil
 }
 
 func stopListening(finish chan bool, connection *net.UDPConn, wg *sync.WaitGroup) {
@@ -42,47 +50,33 @@ func stopListening(finish chan bool, connection *net.UDPConn, wg *sync.WaitGroup
 		case <-finish:
 			connection.Close()
 			wg.Done()
+			return
 		}
 	}
 }
 
-func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, ready chan<- bool, wg *sync.WaitGroup) {
+func listen(receive chan PingMsg, srcAddress string, finish <-chan bool, connection *net.UDPConn, wg *sync.WaitGroup) {
 
-	nodeAddress, _ := net.ResolveUDPAddr("udp", srcAddress)
-
-	connection, err := net.ListenUDP("udp", nodeAddress)
-	if err != nil {
-		log.Warn(err)
-		wg.Done()
-		return
-	}
-
-	ready <- true
 	inputBytes := make([]byte, readMessageSize)
 	for {
-		select {
-		case <-finish:
-			close(receive)
-			connection.Close()
-			wg.Done()
-			return
-		default:
-			//connection.SetReadDeadline(time.Now().Add(checkForStopSignal))
-			connection.Close()
-			len, _, err := connection.ReadFrom(inputBytes)
-			if err != nil && !strings.Contains(err.Error(), "i/o timeout") {
+		len, _, err := connection.ReadFrom(inputBytes)
+		if err != nil {
+			if strings.Contains(err.Error(), "use of closed network connection") {
+				//indicates that the network was closed and we need to stop listening
+				wg.Done()
+				return
+			}
+			log.Warn(err)
+		}
+		if len > 0 {
+
+			var msg PingMsg
+			err = protobuf.Decode(inputBytes, &msg)
+			if err != nil {
 				log.Warn(err)
 			}
-			if len > 0 {
-
-				var msg PingMsg
-				err = protobuf.Decode(inputBytes, &msg)
-				if err != nil {
-					log.Warn(err)
-				}
-				receive <- msg
-				inputBytes = make([]byte, readMessageSize)
-			}
+			receive <- msg
+			inputBytes = make([]byte, readMessageSize)
 		}
 	}
 }

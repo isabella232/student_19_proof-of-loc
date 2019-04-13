@@ -14,13 +14,10 @@ var tSuite = pairing.NewSuiteBn256()
 
 func TestListeningInit(t *testing.T) {
 	var wg sync.WaitGroup
-	_, finish, ready := InitListening("127.0.0.1:30001", &wg)
-	readySig := <-ready
+	_, finish, err := InitListening("127.0.0.1:30001", &wg)
 	finish <- true
 	wg.Wait()
-	close(finish)
-	close(ready)
-	require.True(t, readySig)
+	require.NoError(t, err)
 }
 
 func TestSendingInit(t *testing.T) {
@@ -48,9 +45,9 @@ func TestSendOneMessage(t *testing.T) {
 	dstAddress := el.List[0].Address.NetworkAddress()
 	srcAddress := el.List[1].Address.NetworkAddress()
 
-	receptionChannel, finishListen, readyListen := InitListening(dstAddress, &wg)
+	receptionChannel, finishListen, err := InitListening(dstAddress, &wg)
 
-	<-readyListen
+	require.NoError(t, err)
 
 	pub, _, _ := sigAlg.GenerateKey(nil)
 
@@ -82,9 +79,9 @@ func TestSendTwoMessages(t *testing.T) {
 	dstAddress := el.List[1].Address.NetworkAddress()
 	srcAddress := el.List[0].Address.NetworkAddress()
 
-	receptionChannel, finishListen, ready := InitListening(dstAddress, &wg)
+	receptionChannel, finishListen, err := InitListening(dstAddress, &wg)
 
-	<-ready
+	require.NoError(t, err)
 
 	pub, _, _ := sigAlg.GenerateKey(nil)
 
