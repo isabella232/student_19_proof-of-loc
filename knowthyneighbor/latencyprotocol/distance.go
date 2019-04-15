@@ -236,7 +236,7 @@ type triangle struct {
 //Warning: for now, the following assumptions are made:
 //* all nodes give latencies to all other nodes (except themselves)
 //* all latencies are symmetric (A -> B == B -> A)
-func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int) ([]sigAlg.PublicKey, error) {
+func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int) (Blacklistset, error) {
 
 	triangles := make([]triangle, 0)
 	blockMapper := make(map[string]*Block)
@@ -287,11 +287,11 @@ func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int)
 
 	// At the end, go through the "suspicious" list and count the occurrences of each node
 	//if a given node appears too often, blacklist it
-	blacklist := make([]sigAlg.PublicKey, 0)
+	blacklist := NewBlacklistset()
 
 	for keyString, nbSuspiciousRelations := range suspicious {
 		if nbSuspiciousRelations > threshold {
-			blacklist = append(blacklist, sigAlg.PublicKey([]byte(keyString)))
+			blacklist.Add(sigAlg.PublicKey([]byte(keyString)))
 		}
 	}
 

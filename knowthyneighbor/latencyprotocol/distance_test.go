@@ -7,7 +7,6 @@ import (
 	"go.dedis.ch/onet/v3/log"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"math/rand"
-	"reflect"
 	"testing"
 	"time"
 )
@@ -220,7 +219,40 @@ func TestBlacklistOnAccurateChainEmpty(t *testing.T) {
 		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
 
 		require.NoError(t, err)
-		require.Zero(t, len(blacklist), "Blacklist should be empty")
+		require.Zero(t, blacklist.Size(), "Blacklist should be empty")
+
+	}
+}
+
+func TestBlacklistOnInaccurateChainAllBlacklisted(t *testing.T) {
+
+	N := 4
+	x := 4
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 0
+
+	blacklists := make([]Blacklistset, N)
+
+	chain, nodeIDs := initChain(N, x, inaccurate)
+
+	for index, NodeID := range nodeIDs {
+		node := Node{
+			ID:                      NodeID,
+			SendingAddress:          "address",
+			PrivateKey:              nil,
+			LatenciesInConstruction: nil,
+			BlockSkeleton:           nil,
+			NbLatenciesRefreshed:    0,
+			IncomingMessageChannel:  nil,
+			BlockChannel:            nil,
+		}
+
+		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
+
+		blacklists[index] = blacklist
+
+		require.NoError(t, err)
+		require.Equal(t, N, blacklist.Size(), "Blacklist should contain all nodes")
 
 	}
 }
@@ -286,7 +318,7 @@ func TestSmallNetworkBlacklist(t *testing.T) {
 		BucketName: []byte("TestBucket"),
 	}
 
-	blacklists := make([][]sigAlg.PublicKey, N)
+	blacklists := make([]Blacklistset, N)
 
 	for index, key := range []sigAlg.PublicKey{
 		sigAlg.PublicKey("A"),
@@ -307,18 +339,19 @@ func TestSmallNetworkBlacklist(t *testing.T) {
 		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
 
 		require.NoError(t, err)
-		require.NotZero(t, len(blacklist))
+		require.NotZero(t, blacklist.Size())
 		blacklists[index] = blacklist
 
 	}
 
 	firstBlacklist := blacklists[0]
 
-	require.Equal(t, 2, len(firstBlacklist))
-	require.Contains(t, firstBlacklist, sigAlg.PublicKey([]byte("A")), sigAlg.PublicKey([]byte("D")))
+	require.Equal(t, 2, firstBlacklist.Size())
+	require.True(t, firstBlacklist.Contains(sigAlg.PublicKey([]byte("A"))))
+	require.True(t, firstBlacklist.Contains(sigAlg.PublicKey([]byte("D"))))
 
 	for _, blacklist := range blacklists[1:] {
-		require.True(t, blacklistsEquivalent(blacklist, firstBlacklist))
+		require.True(t, blacklist.Equals(&firstBlacklist))
 	}
 
 }
@@ -399,7 +432,7 @@ func TestExactlyOneLiarBlacklistedLarge(t *testing.T) {
 		BucketName: []byte("TestBucket"),
 	}
 
-	blacklists := make([][]sigAlg.PublicKey, N)
+	blacklists := make([]Blacklistset, N)
 
 	for index, key := range []sigAlg.PublicKey{
 		sigAlg.PublicKey("A"),
@@ -421,23 +454,23 @@ func TestExactlyOneLiarBlacklistedLarge(t *testing.T) {
 		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
 
 		require.NoError(t, err)
-		require.NotZero(t, len(blacklist))
+		require.NotZero(t, blacklist.Size())
 		blacklists[index] = blacklist
 
 	}
 
 	firstBlacklist := blacklists[0]
 
-	require.Equal(t, 1, len(firstBlacklist))
-	require.Contains(t, firstBlacklist, sigAlg.PublicKey([]byte("C")))
+	require.Equal(t, 1, firstBlacklist.Size())
+	require.True(t, firstBlacklist.Contains(sigAlg.PublicKey([]byte("C"))))
 
 	for _, blacklist := range blacklists[1:] {
-		require.True(t, blacklistsEquivalent(blacklist, firstBlacklist))
+		require.True(t, blacklist.Equals(&firstBlacklist))
 	}
 
 }
 
-func blacklistsEquivalent(a, b []sigAlg.PublicKey) bool {
+/*func blacklistsEquivalent(a, b []sigAlg.PublicKey) bool {
 
 	// If one is nil, the other must also be nil.
 	if (a == nil) != (b == nil) {
@@ -464,4 +497,4 @@ func contains(s []sigAlg.PublicKey, e sigAlg.PublicKey) bool {
 		}
 	}
 	return false
-}
+}*/
