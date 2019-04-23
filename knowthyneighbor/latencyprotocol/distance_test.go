@@ -27,7 +27,7 @@ all nodes are honest, each node adds in the blockchain x distances from itself t
 where these x nodes are randomly chosen. You can assume for now that there’s a publicly known source
 of randomness that nodes use. Check the results by varying the number x and the total number of nodes N.*/
 
-func initChain(N int, x int, src sourceType) (*Chain, []*NodeID) {
+func initChain(N int, x int, src sourceType, nbLiars int, nbVictims int) (*Chain, []*NodeID) {
 	local := onet.NewTCPTest(distanceSuite)
 	local.Check = onet.CheckNone
 	_, el, _ := local.GenTree(N, false)
@@ -78,11 +78,21 @@ func initChain(N int, x int, src sourceType) (*Chain, []*NodeID) {
 						nil,
 					}
 				case inaccurate:
-					latencies[string(nodeIDs[j].PublicKey)] = ConfirmedLatency{
-						time.Duration(((i * 10000) + j + 1)),
-						nil,
-						time.Now(),
-						nil,
+					if i < nbLiars && (N-nbVictims) <= j {
+						latencies[string(nodeIDs[j].PublicKey)] = ConfirmedLatency{
+							time.Duration(((i * 10000) + j + 1)),
+							nil,
+							time.Now(),
+							nil,
+						}
+					} else {
+						latencies[string(nodeIDs[j].PublicKey)] =
+							ConfirmedLatency{
+								time.Duration(10 * (i + j + 1)),
+								nil,
+								time.Now(),
+								nil,
+							}
 					}
 
 				}
@@ -101,7 +111,7 @@ func TestApproximateDistanceAllInformation(t *testing.T) {
 	N := 3
 	x := 2
 
-	chain, _ := initChain(N, x, accurate)
+	chain, _ := initChain(N, x, accurate, 0, 0)
 
 	_, exists := chain.Blocks[0].Latencies[string(chain.Blocks[1].ID.PublicKey)]
 
@@ -132,7 +142,7 @@ func TestApproximateDistanceInaccurateInformation(t *testing.T) {
 	N := 6
 	x := 4
 
-	chain, _ := initChain(N, x, inaccurate)
+	chain, _ := initChain(N, x, inaccurate, N, N)
 
 	_, isValid, err := chain.Blocks[0].ApproximateDistance(chain.Blocks[1], chain.Blocks[2], 0)
 
@@ -160,7 +170,7 @@ func TestApproximateDistanceIncompleteInformation(t *testing.T) {
 	expectedD02 := time.Duration(((2 * 10000) + 1))
 	expectedD12 := Pythagoras(expectedD01, expectedD02)
 
-	chain, _ := initChain(N, x, inaccurate)
+	chain, _ := initChain(N, x, inaccurate, N, N)
 
 	d01, isValid01, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[0], chain.Blocks[1], 10000)
 
@@ -186,7 +196,7 @@ func TestApproximateDistanceMissingInformation(t *testing.T) {
 	N := 5
 	x := 1
 
-	chain, _ := initChain(N, x, accurate)
+	chain, _ := initChain(N, x, accurate, 0, 0)
 
 	_, isValid, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[3], chain.Blocks[4], 0)
 
@@ -202,7 +212,7 @@ func TestBlacklistOnAccurateChainEmpty(t *testing.T) {
 	d := 1 * time.Nanosecond
 	suspicionThreshold := 0
 
-	chain, nodeIDs := initChain(N, x, accurate)
+	chain, nodeIDs := initChain(N, x, accurate, 0, 0)
 
 	for _, NodeID := range nodeIDs {
 		node := Node{
@@ -229,11 +239,11 @@ func TestBlacklistOnInaccurateChainAllBlacklisted(t *testing.T) {
 	N := 4
 	x := 4
 	d := 1 * time.Nanosecond
-	suspicionThreshold := 0
+	suspicionThreshold := 1
 
 	blacklists := make([]Blacklistset, N)
 
-	chain, nodeIDs := initChain(N, x, inaccurate)
+	chain, nodeIDs := initChain(N, x, inaccurate, N, N)
 
 	for index, NodeID := range nodeIDs {
 		node := Node{
@@ -257,7 +267,40 @@ func TestBlacklistOnInaccurateChainAllBlacklisted(t *testing.T) {
 	}
 }
 
-func TestSmallNetworkBlacklist(t *testing.T) {
+/*func TestBlacklistPlausibleLies(t *testing.T) {
+	N := 4
+	x := 4
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 0
+
+	blacklists := make([]Blacklistset, N)
+
+	chain, nodeIDs := initChain(N, x, variant)
+
+	for index, NodeID := range nodeIDs {
+		node := Node{
+			ID:                      NodeID,
+			SendingAddress:          "address",
+			PrivateKey:              nil,
+			LatenciesInConstruction: nil,
+			BlockSkeleton:           nil,
+			NbLatenciesRefreshed:    0,
+			IncomingMessageChannel:  nil,
+			BlockChannel:            nil,
+		}
+
+		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
+
+		blacklists[index] = blacklist
+
+		require.NoError(t, err)
+		require.Equal(t, N, blacklist.Size(), "Blacklist should contain all nodes")
+
+	}
+
+}*/
+
+func TestBlacklistSmallNetwork(t *testing.T) {
 
 	// A <-> D does not make sense, not enough info to know who is evil
 
@@ -356,7 +399,7 @@ func TestSmallNetworkBlacklist(t *testing.T) {
 
 }
 
-func TestExactlyOneLiarBlacklistedLarge(t *testing.T) {
+func TestBlacklistExactlyOneLiarLarge(t *testing.T) {
 
 	N := 5
 	d := 1 * time.Nanosecond
