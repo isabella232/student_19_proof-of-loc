@@ -210,3 +210,8 @@ func setLiarAndVictim(chain *Chain, liar string, victim string, latency int) {
 	chain.Blocks[lettersToNumbers[victim]].Latencies[liar] = ConfirmedLatency{time.Duration(time.Duration(latency) * time.Nanosecond), nil, time.Now(), nil}
 
 }
+
+func deleteLatency(chain *Chain, node1 string, node2 string) {
+	delete(chain.Blocks[lettersToNumbers[node1]].Latencies, node2)
+	delete(chain.Blocks[lettersToNumbers[node2]].Latencies, node1)
+}

@@ -267,11 +267,11 @@ func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int)
 					if Dstring != Cstring && Dstring != Bstring && !triangleAlreadyEvaluated(Bstring, Cstring, Dstring, triangles) {
 						DBlock := blockMapper[Dstring]
 
-						BtoD, _ := BBlock.getLatency(DBlock)
-						BtoC, _ := BBlock.getLatency(CBlock)
-						CtoD, _ := CBlock.getLatency(DBlock)
+						BtoD, BtoDHere := BBlock.getLatency(DBlock)
+						BtoC, BtoCHere := BBlock.getLatency(CBlock)
+						CtoD, CtoDHere := CBlock.getLatency(DBlock)
 
-						if !triangleInequality(BtoD, BtoC, CtoD) {
+						if BtoDHere && BtoCHere && CtoDHere && !triangleInequality(BtoD, BtoC, CtoD) {
 
 							blacklist.Add(sigAlg.PublicKey([]byte(Bstring)))
 							blacklist.Add(sigAlg.PublicKey([]byte(Cstring)))
