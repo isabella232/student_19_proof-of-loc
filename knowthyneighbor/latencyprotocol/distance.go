@@ -240,11 +240,11 @@ func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int)
 
 	triangles := make([]triangle, 0)
 	blockMapper := make(map[string]*Block)
-	suspicious := make(map[string]int)
+
+	blacklist := NewBlacklistset()
 
 	for _, block := range chain.Blocks {
 		blockMapper[string(block.ID.PublicKey)] = block
-		suspicious[string(block.ID.PublicKey)] = 0
 	}
 
 	//for each node B
@@ -273,29 +273,22 @@ func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int)
 
 						if !triangleInequality(BtoD, BtoC, CtoD) {
 
-							suspicious[Bstring]++
-							suspicious[Cstring]++
-							suspicious[Dstring]++
+							blacklist.Add(sigAlg.PublicKey([]byte(Bstring)))
+							blacklist.Add(sigAlg.PublicKey([]byte(Cstring)))
+							blacklist.Add(sigAlg.PublicKey([]byte(Dstring)))
 						}
 
 						triangles = append(triangles, triangle{Bstring, Cstring, Dstring})
 					}
+
 				}
 			}
 		}
 	}
 
-	// At the end, go through the "suspicious" list and count the occurrences of each node
-	//if a given node appears too often, blacklist it
-	blacklist := NewBlacklistset()
+	threshBlacklist := blacklist.GetBlacklistWithThreshold(threshold)
 
-	for keyString, nbSuspiciousRelations := range suspicious {
-		if nbSuspiciousRelations > threshold {
-			blacklist.Add(sigAlg.PublicKey([]byte(keyString)))
-		}
-	}
-
-	return blacklist, nil
+	return threshBlacklist, nil
 
 }
 
