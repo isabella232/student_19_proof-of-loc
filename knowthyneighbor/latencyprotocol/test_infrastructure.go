@@ -111,3 +111,179 @@ func initChain(N int, x int, src sourceType, nbLiars int, nbVictims int) (*Chain
 	return &chain, nodeIDs
 
 }
+
+func fourNodeChain() (*Chain, []sigAlg.PublicKey) {
+
+	A := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("A"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	B := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("B"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	C := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("C"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	D := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("D"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	chain := &Chain{
+		Blocks:     []*Block{A, B, C, D},
+		BucketName: []byte("TestBucket"),
+	}
+
+	nodes := []sigAlg.PublicKey{
+		sigAlg.PublicKey("A"),
+		sigAlg.PublicKey("B"),
+		sigAlg.PublicKey("C"),
+		sigAlg.PublicKey("D")}
+
+	return chain, nodes
+}
+
+func fiveNodeChain() (*Chain, []sigAlg.PublicKey) {
+	A := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("A"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"E": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	B := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("B"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
+			"E": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	C := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("C"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
+			"E": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	D := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("D"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
+			"E": ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	E := &Block{
+		ID: &NodeID{
+			ServerID:  nil,
+			PublicKey: sigAlg.PublicKey("E"),
+		},
+		Latencies: map[string]ConfirmedLatency{
+			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
+			"C": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
+			"D": ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil},
+		},
+	}
+
+	chain := &Chain{
+		Blocks:     []*Block{A, B, C, D, E},
+		BucketName: []byte("TestBucket"),
+	}
+
+	nodes := []sigAlg.PublicKey{
+		sigAlg.PublicKey("A"),
+		sigAlg.PublicKey("B"),
+		sigAlg.PublicKey("C"),
+		sigAlg.PublicKey("D"),
+		sigAlg.PublicKey("E")}
+
+	return chain, nodes
+}
+
+func setLiarAndVictim(chain *Chain, liar string, victim string, latency int) {
+
+	blockNbLiar := 0
+	switch liar {
+	case "B":
+		blockNbLiar = 1
+	case "C":
+		blockNbLiar = 2
+	case "D":
+		blockNbLiar = 3
+	case "E":
+		blockNbLiar = 4
+	}
+
+	blockNbVictim := 0
+	switch victim {
+	case "B":
+		blockNbVictim = 1
+	case "C":
+		blockNbVictim = 2
+	case "D":
+		blockNbVictim = 3
+	case "E":
+		blockNbVictim = 4
+	}
+
+	chain.Blocks[blockNbLiar].Latencies[victim] = ConfirmedLatency{time.Duration(time.Duration(latency) * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[blockNbVictim].Latencies[liar] = ConfirmedLatency{time.Duration(time.Duration(latency) * time.Nanosecond), nil, time.Now(), nil}
+
+}

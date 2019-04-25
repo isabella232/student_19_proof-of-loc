@@ -2,6 +2,7 @@ package latencyprotocol
 
 import (
 	"github.com/stretchr/testify/require"
+	"go.dedis.ch/onet/v3/log"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"testing"
 	"time"
@@ -71,17 +72,18 @@ func TestBlacklistOnInaccurateChainAllBlacklisted(t *testing.T) {
 
 func TestBlacklistOneLiarOneVictim(t *testing.T) {
 	N := 4
-	x := 4
 	d := 1 * time.Nanosecond
 	suspicionThreshold := 0
 
 	blacklists := make([]Blacklistset, N)
 
-	chain, nodeIDs := initChain(N, x, inaccurate, 1, 1)
+	chain, nodeIDs := fourNodeChain()
 
-	for index, NodeID := range nodeIDs {
+	setLiarAndVictim(chain, "A", "D", 25)
+
+	for index, key := range nodeIDs {
 		node := Node{
-			ID:                      NodeID,
+			ID:                      &NodeID{nil, key},
 			SendingAddress:          "address",
 			PrivateKey:              nil,
 			LatenciesInConstruction: nil,
@@ -109,6 +111,7 @@ func TestBlacklistOneLiarOneVictim(t *testing.T) {
 		strikes[strikeNb]++
 	}
 
+	//expect both liar and victim to get 2 strikes
 	require.Equal(t, 2, strikes[1])
 	require.Equal(t, 2, strikes[2])
 
@@ -118,7 +121,59 @@ func TestBlacklistOneLiarOneVictim(t *testing.T) {
 
 }
 
-func TestBlacklistSmallNetwork(t *testing.T) {
+func TestBlacklistOneLiarTwoVictims(t *testing.T) {
+	N := 4
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 0
+
+	blacklists := make([]Blacklistset, N)
+
+	chain, nodeIDs := fourNodeChain()
+
+	setLiarAndVictim(chain, "A", "B", 25)
+	setLiarAndVictim(chain, "A", "C", 25)
+
+	for index, key := range nodeIDs {
+		node := Node{
+			ID:                      &NodeID{nil, key},
+			SendingAddress:          "address",
+			PrivateKey:              nil,
+			LatenciesInConstruction: nil,
+			BlockSkeleton:           nil,
+			NbLatenciesRefreshed:    0,
+			IncomingMessageChannel:  nil,
+			BlockChannel:            nil,
+		}
+
+		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
+
+		blacklists[index] = blacklist
+
+		require.NoError(t, err)
+
+	}
+
+	firstBlacklist := blacklists[0]
+
+	require.Equal(t, N, firstBlacklist.Size())
+
+	strikes := make(map[int]int, 0)
+
+	for _, strikeNb := range firstBlacklist.Strikes {
+		strikes[strikeNb]++
+	}
+
+	//expect both liar and non-victim to get 2 strikes
+	require.Equal(t, 2, strikes[1])
+	require.Equal(t, 2, strikes[2])
+
+	for _, blacklist := range blacklists[1:] {
+		require.True(t, blacklist.Equals(&firstBlacklist))
+	}
+
+}
+
+func TestBlacklistSmallNetworkAssimmetricalLies(t *testing.T) {
 
 	// A <-> D does not make sense, not enough info to know who is evil
 
@@ -126,66 +181,16 @@ func TestBlacklistSmallNetwork(t *testing.T) {
 	d := 1 * time.Nanosecond
 	suspicionThreshold := 1
 
-	A := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("A"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
+	chain, nodes := fourNodeChain()
 
-	B := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("B"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
-
-	C := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("C"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
-
-	D := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("D"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
-
-	chain := &Chain{
-		Blocks:     []*Block{A, B, C, D},
-		BucketName: []byte("TestBucket"),
-	}
+	chain.Blocks[0].Latencies["D"] = ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[3].Latencies["A"] = ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[1].Latencies["D"] = ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[3].Latencies["B"] = ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil}
 
 	blacklists := make([]Blacklistset, N)
 
-	for index, key := range []sigAlg.PublicKey{
-		sigAlg.PublicKey("A"),
-		sigAlg.PublicKey("B"),
-		sigAlg.PublicKey("C"),
-		sigAlg.PublicKey("D")} {
+	for index, key := range nodes {
 		node := Node{
 			ID:                      &NodeID{nil, key},
 			SendingAddress:          "address",
@@ -217,90 +222,31 @@ func TestBlacklistSmallNetwork(t *testing.T) {
 
 }
 
-func TestBlacklistExactlyOneLiarLarge(t *testing.T) {
+func TestBlacklistExactlyOneLiarLargeAssimmetricalLies(t *testing.T) {
 
 	N := 5
 	d := 1 * time.Nanosecond
 	suspicionThreshold := 2
 
-	A := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("A"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"E": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
+	chain, nodes := fiveNodeChain()
 
-	B := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("B"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
-			"E": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
+	chain.Blocks[1].Latencies["C"] = ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[1].Latencies["D"] = ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil}
 
-	C := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("C"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"E": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
+	chain.Blocks[2].Latencies["B"] = ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[2].Latencies["D"] = ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[2].Latencies["E"] = ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil}
 
-	D := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("D"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"E": ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
+	chain.Blocks[3].Latencies["B"] = ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[3].Latencies["C"] = ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[3].Latencies["E"] = ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil}
 
-	E := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("E"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
-
-	chain := &Chain{
-		Blocks:     []*Block{A, B, C, D, E},
-		BucketName: []byte("TestBucket"),
-	}
+	chain.Blocks[4].Latencies["C"] = ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[4].Latencies["D"] = ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil}
 
 	blacklists := make([]Blacklistset, N)
 
-	for index, key := range []sigAlg.PublicKey{
-		sigAlg.PublicKey("A"),
-		sigAlg.PublicKey("B"),
-		sigAlg.PublicKey("C"),
-		sigAlg.PublicKey("D"),
-		sigAlg.PublicKey("E")} {
+	for index, key := range nodes {
 		node := Node{
 			ID:                      &NodeID{nil, key},
 			SendingAddress:          "address",
