@@ -112,147 +112,95 @@ func initChain(N int, x int, src sourceType, nbLiars int, nbVictims int) (*Chain
 
 }
 
-func fourNodeChain() (*Chain, []sigAlg.PublicKey) {
-
-	A := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("A"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
-
-	B := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("B"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
-
-	C := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("C"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
-
-	D := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("D"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
-
-	chain := &Chain{
-		Blocks:     []*Block{A, B, C, D},
-		BucketName: []byte("TestBucket"),
-	}
-
-	nodes := []sigAlg.PublicKey{
-		sigAlg.PublicKey("A"),
-		sigAlg.PublicKey("B"),
-		sigAlg.PublicKey("C"),
-		sigAlg.PublicKey("D")}
-
-	return chain, nodes
+var lettersToNumbers = map[string]int{
+	"A": 0,
+	"B": 1,
+	"C": 2,
+	"D": 3,
+	"E": 4,
+	"F": 5,
+	"G": 6,
+	"H": 7,
+	"I": 8,
+	"J": 9,
+	"K": 10,
+	"L": 11,
+	"M": 12,
+	"N": 13,
+	"O": 14,
+	"P": 15,
+	"Q": 16,
+	"R": 17,
+	"S": 18,
+	"T": 19,
+	"U": 20,
+	"V": 21,
+	"W": 22,
+	"X": 23,
+	"Y": 24,
+	"Z": 25,
 }
 
-func fiveNodeChain() (*Chain, []sigAlg.PublicKey) {
-	A := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("A"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"E": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
+var numbersToLetters = map[int]string{
+	0:  "A",
+	1:  "B",
+	2:  "C",
+	3:  "D",
+	4:  "E",
+	5:  "F",
+	6:  "G",
+	7:  "H",
+	8:  "I",
+	9:  "J",
+	10: "K",
+	11: "L",
+	12: "M",
+	13: "N",
+	14: "O",
+	15: "P",
+	16: "Q",
+	17: "R",
+	18: "S",
+	19: "T",
+	20: "U",
+	21: "V",
+	22: "W",
+	23: "X",
+	24: "Y",
+	25: "Z",
+}
 
-	B := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("B"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
-			"E": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
+func simpleChain(nbNodes int) (*Chain, []sigAlg.PublicKey) {
+	blocks := make([]*Block, nbNodes)
+	nodes := make([]sigAlg.PublicKey, nbNodes)
 
-	C := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("C"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"E": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
+	for i := 0; i < nbNodes; i++ {
+		latencies := make(map[string]ConfirmedLatency)
 
-	D := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("D"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil},
-			"E": ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil},
-		},
-	}
+		for j := 0; j < nbNodes; j++ {
+			if j != i {
+				latencies[numbersToLetters[j]] = ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil}
+			}
+		}
 
-	E := &Block{
-		ID: &NodeID{
-			ServerID:  nil,
-			PublicKey: sigAlg.PublicKey("E"),
-		},
-		Latencies: map[string]ConfirmedLatency{
-			"A": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"B": ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil},
-			"C": ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil},
-			"D": ConfirmedLatency{time.Duration(20 * time.Nanosecond), nil, time.Now(), nil},
-		},
+		block := &Block{
+			ID: &NodeID{
+				ServerID:  nil,
+				PublicKey: sigAlg.PublicKey(numbersToLetters[i]),
+			},
+			Latencies: latencies,
+		}
+
+		blocks[i] = block
+
+		nodes[i] = sigAlg.PublicKey([]byte(numbersToLetters[i]))
+
 	}
 
 	chain := &Chain{
-		Blocks:     []*Block{A, B, C, D, E},
+		Blocks:     blocks,
 		BucketName: []byte("TestBucket"),
 	}
-
-	nodes := []sigAlg.PublicKey{
-		sigAlg.PublicKey("A"),
-		sigAlg.PublicKey("B"),
-		sigAlg.PublicKey("C"),
-		sigAlg.PublicKey("D"),
-		sigAlg.PublicKey("E")}
 
 	return chain, nodes
 }
