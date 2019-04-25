@@ -77,7 +77,7 @@ func TestBlacklistOneLiarOneVictim(t *testing.T) {
 
 	blacklists := make([]Blacklistset, N)
 
-	chain, nodeIDs := simpleChain(4)
+	chain, nodeIDs := simpleChain(N)
 
 	setLiarAndVictim(chain, "A", "D", 25)
 
@@ -128,7 +128,7 @@ func TestBlacklistOneLiarTwoVictims(t *testing.T) {
 
 	blacklists := make([]Blacklistset, N)
 
-	chain, nodeIDs := simpleChain(4)
+	chain, nodeIDs := simpleChain(N)
 
 	setLiarAndVictim(chain, "A", "B", 25)
 	setLiarAndVictim(chain, "A", "C", 25)
@@ -180,7 +180,7 @@ func TestBlacklistFiveNodesOneLiarTwoVictims(t *testing.T) {
 
 	blacklists := make([]Blacklistset, N)
 
-	chain, nodeIDs := simpleChain(5)
+	chain, nodeIDs := simpleChain(N)
 
 	setLiarAndVictim(chain, "E", "A", 25)
 	setLiarAndVictim(chain, "E", "B", 25)
@@ -227,6 +227,62 @@ func TestBlacklistFiveNodesOneLiarTwoVictims(t *testing.T) {
 
 }
 
+func TestBlacklistEightNodesTwoLiarsThreeVictims(t *testing.T) {
+	N := 8
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 0
+
+	blacklists := make([]Blacklistset, N)
+
+	chain, nodeIDs := simpleChain(N)
+
+	setLiarAndVictim(chain, "G", "A", 25)
+	setLiarAndVictim(chain, "G", "B", 25)
+	setLiarAndVictim(chain, "G", "C", 25)
+	setLiarAndVictim(chain, "H", "A", 25)
+	setLiarAndVictim(chain, "H", "B", 25)
+	setLiarAndVictim(chain, "H", "C", 25)
+
+	for index, key := range nodeIDs {
+		node := Node{
+			ID:                      &NodeID{nil, key},
+			SendingAddress:          "address",
+			PrivateKey:              nil,
+			LatenciesInConstruction: nil,
+			BlockSkeleton:           nil,
+			NbLatenciesRefreshed:    0,
+			IncomingMessageChannel:  nil,
+			BlockChannel:            nil,
+		}
+
+		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
+
+		blacklists[index] = blacklist
+
+		require.NoError(t, err)
+
+	}
+
+	firstBlacklist := blacklists[0]
+
+	require.Equal(t, N, firstBlacklist.Size())
+
+	strikes := make(map[int]int, 0)
+
+	for _, strikeNb := range firstBlacklist.Strikes {
+		strikes[strikeNb]++
+	}
+
+	//expect liars to get nine strikes and the rest to get 6
+	require.Equal(t, 6, strikes[6])
+	require.Equal(t, 2, strikes[9])
+
+	for _, blacklist := range blacklists[1:] {
+		require.True(t, blacklist.Equals(&firstBlacklist))
+	}
+
+}
+
 func TestBlacklistSmallNetworkAssimmetricalLies(t *testing.T) {
 
 	// A <-> D does not make sense, not enough info to know who is evil
@@ -235,7 +291,7 @@ func TestBlacklistSmallNetworkAssimmetricalLies(t *testing.T) {
 	d := 1 * time.Nanosecond
 	suspicionThreshold := 1
 
-	chain, nodes := simpleChain(4)
+	chain, nodes := simpleChain(N)
 
 	chain.Blocks[0].Latencies["D"] = ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil}
 	chain.Blocks[3].Latencies["A"] = ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil}
@@ -282,7 +338,7 @@ func TestBlacklistExactlyOneLiarLargeAssimmetricalLies(t *testing.T) {
 	d := 1 * time.Nanosecond
 	suspicionThreshold := 2
 
-	chain, nodes := simpleChain(5)
+	chain, nodes := simpleChain(N)
 
 	chain.Blocks[1].Latencies["C"] = ConfirmedLatency{time.Duration(25 * time.Nanosecond), nil, time.Now(), nil}
 	chain.Blocks[1].Latencies["D"] = ConfirmedLatency{time.Duration(12 * time.Nanosecond), nil, time.Now(), nil}

@@ -206,32 +206,7 @@ func simpleChain(nbNodes int) (*Chain, []sigAlg.PublicKey) {
 }
 
 func setLiarAndVictim(chain *Chain, liar string, victim string, latency int) {
-
-	blockNbLiar := 0
-	switch liar {
-	case "B":
-		blockNbLiar = 1
-	case "C":
-		blockNbLiar = 2
-	case "D":
-		blockNbLiar = 3
-	case "E":
-		blockNbLiar = 4
-	}
-
-	blockNbVictim := 0
-	switch victim {
-	case "B":
-		blockNbVictim = 1
-	case "C":
-		blockNbVictim = 2
-	case "D":
-		blockNbVictim = 3
-	case "E":
-		blockNbVictim = 4
-	}
-
-	chain.Blocks[blockNbLiar].Latencies[victim] = ConfirmedLatency{time.Duration(time.Duration(latency) * time.Nanosecond), nil, time.Now(), nil}
-	chain.Blocks[blockNbVictim].Latencies[liar] = ConfirmedLatency{time.Duration(time.Duration(latency) * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[lettersToNumbers[liar]].Latencies[victim] = ConfirmedLatency{time.Duration(time.Duration(latency) * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[lettersToNumbers[victim]].Latencies[liar] = ConfirmedLatency{time.Duration(time.Duration(latency) * time.Nanosecond), nil, time.Now(), nil}
 
 }
