@@ -7,6 +7,8 @@ import (
 	sigAlg "golang.org/x/crypto/ed25519"
 	"math/rand"
 	"reflect"
+	"sort"
+	"strconv"
 	"time"
 )
 
@@ -221,9 +223,17 @@ func deleteLatency(chain *Chain, node1 string, node2 string) {
 func checkBlacklistWithRemovedLatencies(chain *Chain, nodes []sigAlg.PublicKey) string {
 
 	str := ""
+	recap := "\nRecap: \n"
 
 	delta := time.Duration(0)
 	thresh := 0
+
+	node1 := Node{
+		ID: chain.Blocks[0].ID,
+	}
+
+	originalBlacklist, _ := node1.CreateBlacklist(chain, delta, thresh)
+	originalThresh, originalBlack := originalBlacklist.GetBestThreshold()
 
 	checkedNodes := make(map[string]bool, 0)
 
@@ -231,26 +241,43 @@ func checkBlacklistWithRemovedLatencies(chain *Chain, nodes []sigAlg.PublicKey) 
 		node1Key := string(block.ID.PublicKey)
 		checkedNodes[node1Key] = true
 
-		node1 := Node{
-			ID: block.ID,
+		keys2 := make([]string, 0, len(block.Latencies))
+		for key := range block.Latencies {
+			keys2 = append(keys2, key)
 		}
+		sort.Strings(keys2)
 
-		originalBlacklist, _ := node1.CreateBlacklist(chain, delta, thresh)
-
-		for node2Key, latency := range block.Latencies {
+		for _, node2Key := range keys2 {
 			_, nodeChecked := checkedNodes[node2Key]
 			if !nodeChecked {
 				deleteLatency(chain, node1Key, node2Key)
 				newBlacklist, _ := node1.CreateBlacklist(chain, delta, thresh)
-				str += "\n Removing: " + node1Key + " <-> " + node2Key + originalBlacklist.PrintDifferencesTo(&newBlacklist)
-				setLiarAndVictim(chain, node1Key, node2Key, latency.Latency)
+				newThresh, newBlack := newBlacklist.GetBestThreshold()
+				str += "\nRemoving: " + node1Key + " <-> " + node2Key + originalBlacklist.PrintDifferencesTo(&newBlacklist)
+				setLiarAndVictim(chain, node1Key, node2Key, block.Latencies[node2Key].Latency)
+
+				recap += "Removed: " + node1Key + " <-> " + node2Key + ": "
+				if !newBlack.NodesEqual(originalBlack) {
+					if newThresh == -1 {
+						recap += "	* Blacklist emptied"
+					} else {
+						recap += "	* New Blacklist: " + originalBlack.NodesToString() + " -> " + newBlack.NodesToString()
+					}
+				} else {
+					recap += "	* No changes"
+				}
+
+				if originalThresh != newThresh && newThresh != -1 {
+					recap += "	* New Thresh: " + strconv.Itoa(originalThresh) + " -> " + strconv.Itoa(newThresh)
+				}
+				recap += "\n"
 			}
 
 		}
 
 	}
 
-	return str
+	return recap + str
 
 }
 
