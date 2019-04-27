@@ -54,7 +54,7 @@ func (set *Blacklistset) Contains(key sigAlg.PublicKey, thresh int) bool {
 		return false
 	}
 
-	return nbStrikes > thresh
+	return nbStrikes >= thresh
 }
 
 //NumberStrikes give the numeber of Strikes a node got

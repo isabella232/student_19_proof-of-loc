@@ -289,7 +289,7 @@ func TestBlacklistSmallNetworkAssimmetricalLies(t *testing.T) {
 
 	N := 4
 	d := 1 * time.Nanosecond
-	suspicionThreshold := 1
+	suspicionThreshold := 2
 
 	chain, nodes := simpleChain(N)
 
@@ -336,7 +336,7 @@ func TestBlacklistExactlyOneLiarLargeAssimmetricalLies(t *testing.T) {
 
 	N := 5
 	d := 1 * time.Nanosecond
-	suspicionThreshold := 2
+	suspicionThreshold := 3
 
 	chain, nodes := simpleChain(N)
 
@@ -358,14 +358,7 @@ func TestBlacklistExactlyOneLiarLargeAssimmetricalLies(t *testing.T) {
 
 	for index, key := range nodes {
 		node := Node{
-			ID:                      &NodeID{nil, key},
-			SendingAddress:          "address",
-			PrivateKey:              nil,
-			LatenciesInConstruction: nil,
-			BlockSkeleton:           nil,
-			NbLatenciesRefreshed:    0,
-			IncomingMessageChannel:  nil,
-			BlockChannel:            nil,
+			ID: &NodeID{nil, key},
 		}
 
 		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
@@ -377,6 +370,9 @@ func TestBlacklistExactlyOneLiarLargeAssimmetricalLies(t *testing.T) {
 	}
 
 	firstBlacklist := blacklists[0]
+
+	log.Print(firstBlacklist.ToString())
+	log.Print(firstBlacklist.Contains(sigAlg.PublicKey([]byte("C")), suspicionThreshold))
 
 	require.Equal(t, 1, firstBlacklist.Size())
 	require.True(t, firstBlacklist.Contains(sigAlg.PublicKey([]byte("C")), suspicionThreshold))
