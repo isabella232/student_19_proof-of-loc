@@ -3,8 +3,10 @@ package latencyprotocol
 import (
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
+	//"go.dedis.ch/onet/v3/log"
 	sigAlg "golang.org/x/crypto/ed25519"
 	"math/rand"
+	"reflect"
 	"time"
 )
 
@@ -205,13 +207,78 @@ func simpleChain(nbNodes int) (*Chain, []sigAlg.PublicKey) {
 	return chain, nodes
 }
 
-func setLiarAndVictim(chain *Chain, liar string, victim string, latency int) {
-	chain.Blocks[lettersToNumbers[liar]].Latencies[victim] = ConfirmedLatency{time.Duration(time.Duration(latency) * time.Nanosecond), nil, time.Now(), nil}
-	chain.Blocks[lettersToNumbers[victim]].Latencies[liar] = ConfirmedLatency{time.Duration(time.Duration(latency) * time.Nanosecond), nil, time.Now(), nil}
+func setLiarAndVictim(chain *Chain, liar string, victim string, latency time.Duration) {
+	chain.Blocks[lettersToNumbers[liar]].Latencies[victim] = ConfirmedLatency{time.Duration(latency * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[lettersToNumbers[victim]].Latencies[liar] = ConfirmedLatency{time.Duration(latency * time.Nanosecond), nil, time.Now(), nil}
 
 }
 
 func deleteLatency(chain *Chain, node1 string, node2 string) {
 	delete(chain.Blocks[lettersToNumbers[node1]].Latencies, node2)
 	delete(chain.Blocks[lettersToNumbers[node2]].Latencies, node1)
+}
+
+func checkBlacklistWithRemovedLatencies(chain *Chain, nodes []sigAlg.PublicKey) string {
+
+	str := ""
+
+	delta := time.Duration(0)
+	thresh := 0
+
+	checkedNodes := make(map[string]bool, 0)
+
+	for _, block := range chain.Blocks {
+		node1Key := string(block.ID.PublicKey)
+		checkedNodes[node1Key] = true
+
+		node1 := Node{
+			ID: block.ID,
+		}
+
+		originalBlacklist, _ := node1.CreateBlacklist(chain, delta, thresh)
+
+		for node2Key, latency := range block.Latencies {
+			_, nodeChecked := checkedNodes[node2Key]
+			if !nodeChecked {
+				deleteLatency(chain, node1Key, node2Key)
+				newBlacklist, _ := node1.CreateBlacklist(chain, delta, thresh)
+				str += "\n Removing: " + node1Key + " <-> " + node2Key + originalBlacklist.PrintDifferencesTo(&newBlacklist)
+				setLiarAndVictim(chain, node1Key, node2Key, latency.Latency)
+			}
+
+		}
+
+	}
+
+	return str
+
+}
+
+func blacklistsEquivalent(a, b []sigAlg.PublicKey) bool {
+
+	// If one is nil, the other must also be nil.
+	if (a == nil) != (b == nil) {
+		return false
+	}
+
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if !contains(b, a[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func contains(s []sigAlg.PublicKey, e sigAlg.PublicKey) bool {
+	for _, a := range s {
+		if reflect.DeepEqual(a, e) {
+			return true
+		}
+	}
+	return false
 }

@@ -8,6 +8,17 @@ import (
 	"time"
 )
 
+func TestBlacklist1Liar1Victim(t *testing.T) {
+	N := 4
+
+	chain, nodeIDs := simpleChain(N)
+
+	setLiarAndVictim(chain, "A", "D", 25)
+
+	log.Print(checkBlacklistWithRemovedLatencies(chain, nodeIDs))
+
+}
+
 func TestBlacklistStillAccurateOnEmptyChain(t *testing.T) {
 
 	N := 4

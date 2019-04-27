@@ -110,3 +110,16 @@ func (set *Blacklistset) ToString() string {
 	}
 	return str
 }
+
+//PrintDifferencesTo returns a string showing the differences between two blacklistsets
+func (set *Blacklistset) PrintDifferencesTo(other *Blacklistset) string {
+	str := "\n"
+	for key, val1 := range set.Strikes {
+		val2, here := other.Strikes[key]
+		if here {
+			str += key + ": " + strconv.Itoa(val1) + " -> " + strconv.Itoa(val2) + "\n"
+		}
+	}
+
+	return str
+}

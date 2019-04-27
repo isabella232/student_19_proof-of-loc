@@ -386,32 +386,3 @@ func TestBlacklistExactlyOneLiarLargeAssimmetricalLies(t *testing.T) {
 	}
 
 }
-
-/*func blacklistsEquivalent(a, b []sigAlg.PublicKey) bool {
-
-	// If one is nil, the other must also be nil.
-	if (a == nil) != (b == nil) {
-		return false
-	}
-
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i := range a {
-		if !contains(b, a[i]) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func contains(s []sigAlg.PublicKey, e sigAlg.PublicKey) bool {
-	for _, a := range s {
-		if reflect.DeepEqual(a, e) {
-			return true
-		}
-	}
-	return false
-}*/
