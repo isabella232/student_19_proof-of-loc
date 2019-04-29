@@ -19,14 +19,7 @@ func TestBlacklistOnAccurateChainEmpty(t *testing.T) {
 
 	for _, NodeID := range nodeIDs {
 		node := Node{
-			ID:                      NodeID,
-			SendingAddress:          "address",
-			PrivateKey:              nil,
-			LatenciesInConstruction: nil,
-			BlockSkeleton:           nil,
-			NbLatenciesRefreshed:    0,
-			IncomingMessageChannel:  nil,
-			BlockChannel:            nil,
+			ID: NodeID,
 		}
 
 		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
@@ -35,6 +28,11 @@ func TestBlacklistOnAccurateChainEmpty(t *testing.T) {
 		require.Zero(t, blacklist.Size(), "Blacklist should be empty")
 
 	}
+
+	blacklistAverage, err := AverageBlacklists(chain, d, suspicionThreshold, 5)
+
+	require.NoError(t, err)
+	require.Zero(t, blacklistAverage.Size())
 }
 
 func TestBlacklistOnInaccurateChainAllBlacklisted(t *testing.T) {
@@ -50,14 +48,7 @@ func TestBlacklistOnInaccurateChainAllBlacklisted(t *testing.T) {
 
 	for index, NodeID := range nodeIDs {
 		node := Node{
-			ID:                      NodeID,
-			SendingAddress:          "address",
-			PrivateKey:              nil,
-			LatenciesInConstruction: nil,
-			BlockSkeleton:           nil,
-			NbLatenciesRefreshed:    0,
-			IncomingMessageChannel:  nil,
-			BlockChannel:            nil,
+			ID: NodeID,
 		}
 
 		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
@@ -68,6 +59,12 @@ func TestBlacklistOnInaccurateChainAllBlacklisted(t *testing.T) {
 		require.Equal(t, N, blacklist.Size(), "Blacklist should contain all nodes")
 
 	}
+
+	blacklistAverage, err := AverageBlacklists(chain, d, suspicionThreshold, 5)
+
+	require.NoError(t, err)
+	require.Equal(t, N, blacklistAverage.Size())
+
 }
 
 func TestBlacklistOneLiarOneVictim(t *testing.T) {
@@ -83,14 +80,7 @@ func TestBlacklistOneLiarOneVictim(t *testing.T) {
 
 	for index, key := range nodeIDs {
 		node := Node{
-			ID:                      &NodeID{nil, key},
-			SendingAddress:          "address",
-			PrivateKey:              nil,
-			LatenciesInConstruction: nil,
-			BlockSkeleton:           nil,
-			NbLatenciesRefreshed:    0,
-			IncomingMessageChannel:  nil,
-			BlockChannel:            nil,
+			ID: &NodeID{nil, key},
 		}
 
 		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
@@ -121,6 +111,33 @@ func TestBlacklistOneLiarOneVictim(t *testing.T) {
 
 }
 
+func TestAverageBlacklistOneLiarOneVictim(t *testing.T) {
+	N := 4
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 0
+
+	chain, _ := simpleChain(N)
+
+	setLiarAndVictim(chain, "A", "D", 25)
+
+	blacklist, err := AverageBlacklists(chain, d, suspicionThreshold, 5)
+
+	require.NoError(t, err)
+
+	require.Equal(t, N, blacklist.Size())
+
+	strikes := make(map[int]int, 0)
+
+	for _, strikeNb := range blacklist.Strikes {
+		strikes[strikeNb]++
+	}
+
+	//expect both liar and victim to get 2 strikes
+	require.Equal(t, 2, strikes[1])
+	require.Equal(t, 2, strikes[2])
+
+}
+
 func TestBlacklistOneLiarTwoVictims(t *testing.T) {
 	N := 4
 	d := 1 * time.Nanosecond
@@ -135,14 +152,7 @@ func TestBlacklistOneLiarTwoVictims(t *testing.T) {
 
 	for index, key := range nodeIDs {
 		node := Node{
-			ID:                      &NodeID{nil, key},
-			SendingAddress:          "address",
-			PrivateKey:              nil,
-			LatenciesInConstruction: nil,
-			BlockSkeleton:           nil,
-			NbLatenciesRefreshed:    0,
-			IncomingMessageChannel:  nil,
-			BlockChannel:            nil,
+			ID: &NodeID{nil, key},
 		}
 
 		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
@@ -187,14 +197,7 @@ func TestBlacklistFiveNodesOneLiarTwoVictims(t *testing.T) {
 
 	for index, key := range nodeIDs {
 		node := Node{
-			ID:                      &NodeID{nil, key},
-			SendingAddress:          "address",
-			PrivateKey:              nil,
-			LatenciesInConstruction: nil,
-			BlockSkeleton:           nil,
-			NbLatenciesRefreshed:    0,
-			IncomingMessageChannel:  nil,
-			BlockChannel:            nil,
+			ID: &NodeID{nil, key},
 		}
 
 		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
@@ -215,15 +218,38 @@ func TestBlacklistFiveNodesOneLiarTwoVictims(t *testing.T) {
 		strikes[strikeNb]++
 	}
 
-	log.Print(firstBlacklist.ToString())
-
-	//expect both liar and non-victim to get 2 strikes
-	//require.Equal(t, 2, strikes[1])
-	//require.Equal(t, 2, strikes[2])
+	require.Equal(t, 1, strikes[4])
+	require.Equal(t, 4, strikes[2])
 
 	for _, blacklist := range blacklists[1:] {
 		require.True(t, blacklist.Equals(&firstBlacklist))
 	}
+
+}
+
+func TestAverageBlacklistFiveNodesOneLiarTwoVictims(t *testing.T) {
+	N := 5
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 0
+
+	chain, _ := simpleChain(N)
+
+	setLiarAndVictim(chain, "E", "A", 25)
+	setLiarAndVictim(chain, "E", "B", 25)
+
+	firstBlacklist, err := AverageBlacklists(chain, d, suspicionThreshold, 5)
+
+	require.NoError(t, err)
+	require.Equal(t, N, firstBlacklist.Size())
+
+	strikes := make(map[int]int, 0)
+
+	for _, strikeNb := range firstBlacklist.Strikes {
+		strikes[strikeNb]++
+	}
+
+	require.Equal(t, 1, strikes[4])
+	require.Equal(t, 4, strikes[2])
 
 }
 
@@ -245,14 +271,7 @@ func TestBlacklistEightNodesTwoLiarsThreeVictims(t *testing.T) {
 
 	for index, key := range nodeIDs {
 		node := Node{
-			ID:                      &NodeID{nil, key},
-			SendingAddress:          "address",
-			PrivateKey:              nil,
-			LatenciesInConstruction: nil,
-			BlockSkeleton:           nil,
-			NbLatenciesRefreshed:    0,
-			IncomingMessageChannel:  nil,
-			BlockChannel:            nil,
+			ID: &NodeID{nil, key},
 		}
 
 		blacklist, err := node.CreateBlacklist(chain, d, suspicionThreshold)
@@ -264,6 +283,8 @@ func TestBlacklistEightNodesTwoLiarsThreeVictims(t *testing.T) {
 	}
 
 	firstBlacklist := blacklists[0]
+
+	print(firstBlacklist.ToString())
 
 	require.Equal(t, N, firstBlacklist.Size())
 
@@ -280,6 +301,75 @@ func TestBlacklistEightNodesTwoLiarsThreeVictims(t *testing.T) {
 	for _, blacklist := range blacklists[1:] {
 		require.True(t, blacklist.Equals(&firstBlacklist))
 	}
+
+}
+
+func TestAveragedBlacklistEightNodesTwoLiarsThreeVictims(t *testing.T) {
+	N := 8
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 0
+
+	chain, _ := simpleChain(N)
+
+	setLiarAndVictim(chain, "G", "A", 25)
+	setLiarAndVictim(chain, "G", "B", 25)
+	setLiarAndVictim(chain, "G", "C", 25)
+	setLiarAndVictim(chain, "H", "A", 25)
+	setLiarAndVictim(chain, "H", "B", 25)
+	setLiarAndVictim(chain, "H", "C", 25)
+
+	firstBlacklist, err := AverageBlacklists(chain, d, suspicionThreshold, 5)
+	require.NoError(t, err)
+
+	print(firstBlacklist.ToString())
+
+	require.Equal(t, 2, firstBlacklist.Size())
+
+	strikes := make(map[int]int, 0)
+
+	for _, strikeNb := range firstBlacklist.Strikes {
+		strikes[strikeNb]++
+	}
+
+	//expect liars to get nine strikes and the rest to get 6
+	require.Equal(t, 2, strikes[1])
+	require.Equal(t, 6, strikes[0])
+
+}
+
+func TestAveragedBlacklistEightNodesThreeLiarsThreeVictims(t *testing.T) {
+	N := 8
+	d := 1 * time.Nanosecond
+	suspicionThreshold := 0
+
+	chain, _ := simpleChain(N)
+
+	setLiarAndVictim(chain, "F", "A", 25)
+	setLiarAndVictim(chain, "F", "B", 25)
+	setLiarAndVictim(chain, "F", "C", 25)
+	setLiarAndVictim(chain, "G", "A", 25)
+	setLiarAndVictim(chain, "G", "B", 25)
+	setLiarAndVictim(chain, "G", "C", 25)
+	setLiarAndVictim(chain, "H", "A", 25)
+	setLiarAndVictim(chain, "H", "B", 25)
+	setLiarAndVictim(chain, "H", "C", 25)
+
+	firstBlacklist, err := AverageBlacklists(chain, d, suspicionThreshold, 5)
+	require.NoError(t, err)
+
+	print(firstBlacklist.ToString())
+
+	//require.Equal(t, 2, firstBlacklist.Size())
+
+	strikes := make(map[int]int, 0)
+
+	for _, strikeNb := range firstBlacklist.Strikes {
+		strikes[strikeNb]++
+	}
+
+	//expect liars to get nine strikes and the rest to get 6
+	//require.Equal(t, 2, strikes[1])
+	//require.Equal(t, 6, strikes[0])
 
 }
 

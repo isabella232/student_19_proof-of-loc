@@ -31,15 +31,20 @@ func (set *Blacklistset) Add(key sigAlg.PublicKey) {
 
 }
 
-//AddWithStrikes adds a node's public key to a blacklist a given number of times
-func (set *Blacklistset) AddWithStrikes(key sigAlg.PublicKey, Strikes int) {
-	_, isPresent := set.Strikes[string(key)]
+//AddWithStrikesStringKey adds a node's public key as a string to a blacklist a given number of times
+func (set *Blacklistset) AddWithStrikesStringKey(key string, Strikes int) {
+	_, isPresent := set.Strikes[key]
 	if !isPresent {
-		set.Strikes[string(key)] = Strikes
+		set.Strikes[key] = Strikes
 	} else {
-		set.Strikes[string(key)] += Strikes
+		set.Strikes[key] += Strikes
 	}
 
+}
+
+//AddWithStrikes adds a node's public key to a blacklist a given number of times
+func (set *Blacklistset) AddWithStrikes(key sigAlg.PublicKey, Strikes int) {
+	set.AddWithStrikesStringKey(string(key), Strikes)
 }
 
 //Remove removes a node's public key to a blacklist
@@ -85,7 +90,6 @@ func (set *Blacklistset) GetBestThreshold() (int, *Blacklistset) {
 	for _, strike := range strikeMagnitudes[1:] {
 		strikeDiffs = append(strikeDiffs, strike-prevStrike)
 		prevStrike = strike
-
 	}
 
 	thirdSize := int(math.Ceil(float64(nbStrikes / 3)))
@@ -223,4 +227,11 @@ func (set *Blacklistset) PrintDifferencesTo(other *Blacklistset) string {
 	}
 
 	return str
+}
+
+//CombineWith adds the content of another blacklist to the blacklists
+func (set *Blacklistset) CombineWith(other *Blacklistset) {
+	for k, v := range other.Strikes {
+		set.AddWithStrikesStringKey(k, v)
+	}
 }

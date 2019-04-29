@@ -220,7 +220,7 @@ func deleteLatency(chain *Chain, node1 string, node2 string) {
 	delete(chain.Blocks[lettersToNumbers[node2]].Latencies, node1)
 }
 
-func checkBlacklistWithRemovedLatencies(chain *Chain, nodes []sigAlg.PublicKey) string {
+func checkBlacklistWithRemovedLatencies(chain *Chain, nodes []sigAlg.PublicKey, average bool) string {
 
 	str := ""
 	recap := "\nRecap: \n"
@@ -233,6 +233,9 @@ func checkBlacklistWithRemovedLatencies(chain *Chain, nodes []sigAlg.PublicKey) 
 	}
 
 	originalBlacklist, _ := node1.CreateBlacklist(chain, delta, thresh)
+	if average {
+		originalBlacklist, _ = AverageBlacklists(chain, delta, thresh, 5)
+	}
 	originalThresh, originalBlack := originalBlacklist.GetBestThreshold()
 
 	checkedNodes := make(map[string]bool, 0)
@@ -252,6 +255,9 @@ func checkBlacklistWithRemovedLatencies(chain *Chain, nodes []sigAlg.PublicKey) 
 			if !nodeChecked {
 				deleteLatency(chain, node1Key, node2Key)
 				newBlacklist, _ := node1.CreateBlacklist(chain, delta, thresh)
+				if average {
+					newBlacklist, _ = AverageBlacklists(chain, delta, thresh, 5)
+				}
 				newThresh, newBlack := newBlacklist.GetBestThreshold()
 				str += "\nRemoving: " + node1Key + " <-> " + node2Key + originalBlacklist.PrintDifferencesTo(&newBlacklist)
 				setLiarAndVictim(chain, node1Key, node2Key, block.Latencies[node2Key].Latency)
