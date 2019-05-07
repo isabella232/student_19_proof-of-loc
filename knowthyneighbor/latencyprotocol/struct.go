@@ -1,11 +1,12 @@
 package latencyprotocol
 
 import (
+	"sync"
+	"time"
+
 	"github.com/dedis/student_19_proof-of-loc/knowthyneighbor/udp"
 	"go.dedis.ch/onet/v3/network"
 	sigAlg "golang.org/x/crypto/ed25519"
-	"sync"
-	"time"
 )
 
 //Nonce represents a random value to make a message unique
@@ -52,6 +53,33 @@ type Node struct {
 type Chain struct {
 	Blocks     []*Block
 	BucketName []byte
+}
+
+//Copy creates a deep copy of a chain
+func (chain *Chain) Copy() *Chain {
+	nbBlocks := len(chain.Blocks)
+	blocksCopy := make([]*Block, nbBlocks)
+	for i := 0; i < nbBlocks; i++ {
+		latencies := make(map[string]ConfirmedLatency)
+		for k, v := range chain.Blocks[i].Latencies {
+			latencies[k] = v
+		}
+		blocksCopy[i] = &Block{
+			ID: &NodeID{
+				ServerID:  nil,
+				PublicKey: sigAlg.PublicKey(numbersToNodes(i)),
+			},
+			Latencies: latencies,
+		}
+
+	}
+
+	name := make([]byte, len(chain.BucketName))
+
+	copy(name, chain.BucketName)
+
+	return &Chain{blocksCopy, name}
+
 }
 
 //LatencyConstructor represents the values used during a latency calculation protocol

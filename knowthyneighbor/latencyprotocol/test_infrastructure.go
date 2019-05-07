@@ -3,13 +3,16 @@ package latencyprotocol
 import (
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
+
 	//"go.dedis.ch/onet/v3/log"
-	sigAlg "golang.org/x/crypto/ed25519"
 	"math/rand"
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
+
+	sigAlg "golang.org/x/crypto/ed25519"
 )
 
 type sourceType int
@@ -116,62 +119,13 @@ func initChain(N int, x int, src sourceType, nbLiars int, nbVictims int) (*Chain
 
 }
 
-var lettersToNumbers = map[string]int{
-	"A": 0,
-	"B": 1,
-	"C": 2,
-	"D": 3,
-	"E": 4,
-	"F": 5,
-	"G": 6,
-	"H": 7,
-	"I": 8,
-	"J": 9,
-	"K": 10,
-	"L": 11,
-	"M": 12,
-	"N": 13,
-	"O": 14,
-	"P": 15,
-	"Q": 16,
-	"R": 17,
-	"S": 18,
-	"T": 19,
-	"U": 20,
-	"V": 21,
-	"W": 22,
-	"X": 23,
-	"Y": 24,
-	"Z": 25,
+func numbersToNodes(n int) string {
+	return "N" + strconv.Itoa(n)
 }
 
-var numbersToLetters = map[int]string{
-	0:  "A",
-	1:  "B",
-	2:  "C",
-	3:  "D",
-	4:  "E",
-	5:  "F",
-	6:  "G",
-	7:  "H",
-	8:  "I",
-	9:  "J",
-	10: "K",
-	11: "L",
-	12: "M",
-	13: "N",
-	14: "O",
-	15: "P",
-	16: "Q",
-	17: "R",
-	18: "S",
-	19: "T",
-	20: "U",
-	21: "V",
-	22: "W",
-	23: "X",
-	24: "Y",
-	25: "Z",
+func nodesToNumbers(node string) int {
+	nb, _ := strconv.Atoi(string(node[1:]))
+	return nb
 }
 
 func simpleChain(nbNodes int) (*Chain, []sigAlg.PublicKey) {
@@ -183,21 +137,147 @@ func simpleChain(nbNodes int) (*Chain, []sigAlg.PublicKey) {
 
 		for j := 0; j < nbNodes; j++ {
 			if j != i {
-				latencies[numbersToLetters[j]] = ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil}
+				latencies[numbersToNodes(j)] = ConfirmedLatency{time.Duration(10 * time.Nanosecond), nil, time.Now(), nil}
 			}
 		}
 
 		block := &Block{
 			ID: &NodeID{
 				ServerID:  nil,
-				PublicKey: sigAlg.PublicKey(numbersToLetters[i]),
+				PublicKey: sigAlg.PublicKey(numbersToNodes(i)),
 			},
 			Latencies: latencies,
 		}
 
 		blocks[i] = block
 
-		nodes[i] = sigAlg.PublicKey([]byte(numbersToLetters[i]))
+		nodes[i] = sigAlg.PublicKey([]byte(numbersToNodes(i)))
+
+	}
+
+	chain := &Chain{
+		Blocks:     blocks,
+		BucketName: []byte("TestBucket"),
+	}
+
+	return chain, nodes
+}
+
+func consistentChain(nbNodes int) (*Chain, []sigAlg.PublicKey) {
+
+	latencyMap := make(map[string]int)
+
+	for i := 0; i < nbNodes; i++ {
+
+		for j := i + 1; j < nbNodes; j++ {
+			for k := j + 1; k < nbNodes; k++ {
+				n1 := numbersToNodes(i)
+				n2 := numbersToNodes(j)
+				n3 := numbersToNodes(k)
+				pair1 := n1 + "-" + n2
+				pair2 := n2 + "-" + n3
+				pair3 := n3 + "-" + n1
+
+				lat1, have1 := latencyMap[pair1]
+				lat2, have2 := latencyMap[pair2]
+				lat3, have3 := latencyMap[pair3]
+
+				//All known
+				if have1 && have2 && have3 {
+					continue
+				}
+
+				divider := rand.Intn(4) + 1
+
+				// 2/3 known
+				if !have1 && have2 && have3 {
+					latencyMap[pair1] = int((lat2 + lat3) / (divider))
+					have1 = true
+				}
+
+				if have1 && !have2 && have3 {
+					latencyMap[pair2] = int((lat1 + lat3) / (divider))
+					have2 = true
+				}
+
+				if have1 && have2 && !have3 {
+					latencyMap[pair3] = int((lat1 + lat2) / (divider))
+					have3 = true
+				}
+
+				// 1/3 known
+				if have1 && !have2 && !have3 {
+					lat2 = rand.Int()
+					latencyMap[pair2] = lat2
+					latencyMap[pair3] = int((lat1 + lat2) / (divider))
+					have2 = true
+					have3 = true
+				}
+
+				if !have1 && have2 && !have3 {
+					lat1 = rand.Int()
+					latencyMap[pair1] = lat1
+					latencyMap[pair3] = int((lat1 + lat2) / (divider))
+					have1 = true
+					have3 = true
+				}
+
+				if !have1 && !have2 && have3 {
+					lat1 = rand.Int()
+					latencyMap[pair1] = lat1
+					latencyMap[pair2] = int((lat1 + lat3) / (divider))
+					have1 = true
+					have2 = true
+				}
+
+				// 0/3 known
+				if !have1 && !have2 && !have3 {
+					lat1 = rand.Int()
+					lat2 = rand.Int()
+					latencyMap[pair1] = lat1
+					latencyMap[pair2] = lat2
+					latencyMap[pair3] = int((lat1 + lat2) / (divider))
+					have1 = true
+					have2 = true
+					have3 = true
+				}
+
+			}
+		}
+
+	}
+
+	blocks := make([]*Block, nbNodes)
+	nodes := make([]sigAlg.PublicKey, nbNodes)
+
+	for i := 0; i < nbNodes; i++ {
+		latencies := make(map[string]ConfirmedLatency)
+		for k, v := range latencyMap {
+			splitIndex := strings.Index(k, "-")
+			n1 := k[:splitIndex]
+			n2 := k[splitIndex+1:]
+
+			if nodesToNumbers(n1) == i {
+				latencies[n1] = ConfirmedLatency{time.Duration(v), nil, time.Now(), nil}
+			}
+
+			if nodesToNumbers(n2) == i {
+				latencies[n2] = ConfirmedLatency{time.Duration(v), nil, time.Now(), nil}
+			}
+
+		}
+
+		block := &Block{
+			ID: &NodeID{
+				ServerID:  nil,
+				PublicKey: sigAlg.PublicKey(numbersToNodes(i)),
+			},
+			Latencies: latencies,
+		}
+
+		blocks[i] = block
+
+		nodes[i] = sigAlg.PublicKey([]byte(numbersToNodes(i)))
 
 	}
 
@@ -210,33 +290,33 @@ func simpleChain(nbNodes int) (*Chain, []sigAlg.PublicKey) {
 }
 
 func setLiarAndVictim(chain *Chain, liar string, victim string, latency time.Duration) {
-	chain.Blocks[lettersToNumbers[liar]].Latencies[victim] = ConfirmedLatency{time.Duration(latency * time.Nanosecond), nil, time.Now(), nil}
-	chain.Blocks[lettersToNumbers[victim]].Latencies[liar] = ConfirmedLatency{time.Duration(latency * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[nodesToNumbers(liar)].Latencies[victim] = ConfirmedLatency{time.Duration(latency * time.Nanosecond), nil, time.Now(), nil}
+	chain.Blocks[nodesToNumbers(victim)].Latencies[liar] = ConfirmedLatency{time.Duration(latency * time.Nanosecond), nil, time.Now(), nil}
 
 }
 
 func deleteLatency(chain *Chain, node1 string, node2 string) {
-	delete(chain.Blocks[lettersToNumbers[node1]].Latencies, node2)
-	delete(chain.Blocks[lettersToNumbers[node2]].Latencies, node1)
+	delete(chain.Blocks[nodesToNumbers(node1)].Latencies, node2)
+	delete(chain.Blocks[nodesToNumbers(node2)].Latencies, node1)
 }
 
-func checkBlacklistWithRemovedLatencies(chain *Chain, nodes []sigAlg.PublicKey, average bool) string {
+func checkBlacklistWithRemovedLatencies(chain *Chain, nodes []sigAlg.PublicKey) string {
 
 	str := ""
 	recap := "\nRecap: \n"
 
 	delta := time.Duration(0)
-	thresh := 0
+	threshold := UpperThreshold(len(chain.Blocks))
 
-	node1 := Node{
-		ID: chain.Blocks[0].ID,
+	originalBlacklist, _ := CreateBlacklist(chain, delta)
+
+	if originalBlacklist.IsEmpty() {
+		return "Even without removal, blacklist is empty"
 	}
 
-	originalBlacklist, _ := node1.CreateBlacklist(chain, delta, thresh)
-	if average {
-		originalBlacklist, _ = AverageBlacklists(chain, delta, thresh, 5)
-	}
-	originalThresh, originalBlack := originalBlacklist.GetBestThreshold()
+	originalBlack := originalBlacklist.GetBlacklistWithThreshold(threshold)
+
+	recap += "Threshold: " + strconv.Itoa(threshold) + "\n"
 
 	checkedNodes := make(map[string]bool, 0)
 
@@ -254,17 +334,14 @@ func checkBlacklistWithRemovedLatencies(chain *Chain, nodes []sigAlg.PublicKey, 
 			_, nodeChecked := checkedNodes[node2Key]
 			if !nodeChecked {
 				deleteLatency(chain, node1Key, node2Key)
-				newBlacklist, _ := node1.CreateBlacklist(chain, delta, thresh)
-				if average {
-					newBlacklist, _ = AverageBlacklists(chain, delta, thresh, 5)
-				}
-				newThresh, newBlack := newBlacklist.GetBestThreshold()
-				str += "\nRemoving: " + node1Key + " <-> " + node2Key + originalBlacklist.PrintDifferencesTo(&newBlacklist)
+				newBlack, _ := CreateBlacklist(chain, delta)
+
+				str += "\nRemoving: " + node1Key + " <-> " + node2Key + originalBlacklist.PrintDifferencesTo(&newBlack)
 				setLiarAndVictim(chain, node1Key, node2Key, block.Latencies[node2Key].Latency)
 
 				recap += "Removed: " + node1Key + " <-> " + node2Key + ": "
-				if !newBlack.NodesEqual(originalBlack) {
-					if newThresh == -1 {
+				if !newBlack.NodesEqual(&originalBlack) {
+					if newBlack.IsEmpty() {
 						recap += "	* Blacklist emptied"
 					} else {
 						recap += "	* New Blacklist: " + originalBlack.NodesToString() + " -> " + newBlack.NodesToString()
@@ -273,9 +350,6 @@ func checkBlacklistWithRemovedLatencies(chain *Chain, nodes []sigAlg.PublicKey, 
 					recap += "	* No changes"
 				}
 
-				if originalThresh != newThresh && newThresh != -1 {
-					recap += "	* New Thresh: " + strconv.Itoa(originalThresh) + " -> " + strconv.Itoa(newThresh)
-				}
 				recap += "\n"
 			}
 

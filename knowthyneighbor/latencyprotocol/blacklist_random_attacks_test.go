@@ -1,7 +1,9 @@
 package latencyprotocol
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
 	"go.dedis.ch/onet/v3/log"
 )
@@ -9,55 +11,56 @@ import (
 //Problem: none of the tests create chains that blacklist nodes even with all latencies given
 //Solution: this is the test for coordinated, proving detection does not work in this case
 //Create other file with uncoherent connections instead, where it should work.
-func TestBlacklist1Liar1Victim(t *testing.T) {
+func TestRandomAttack1(t *testing.T) {
 	N := 4
 
 	chain, nodeIDs := simpleChain(N)
 
-	setLiarAndVictim(chain, "N0", "N3", 25)
+	setLiarAndVictim(chain, "N0", "N3", 1000)
+	setLiarAndVictim(chain, "N0", "N2", 40)
 
 	log.Print(checkBlacklistWithRemovedLatencies(chain, nodeIDs))
 
 }
 
-func TestBlacklist2Liars3Victims(t *testing.T) {
+func TestRandomAttack2(t *testing.T) {
 	N := 8
 
 	chain, nodeIDs := simpleChain(N)
 
-	setLiarAndVictim(chain, "N0", "N2", 25)
-	setLiarAndVictim(chain, "N1", "N2", 25)
+	setLiarAndVictim(chain, "N0", "N1", 25)
+	setLiarAndVictim(chain, "N1", "N2", 250)
 	setLiarAndVictim(chain, "N0", "N3", 25)
-	setLiarAndVictim(chain, "N1", "N3", 25)
-	setLiarAndVictim(chain, "N0", "N4", 25)
-	setLiarAndVictim(chain, "N1", "N4", 25)
+	setLiarAndVictim(chain, "N1", "N4", 3)
+	setLiarAndVictim(chain, "N0", "N5", 25)
+	setLiarAndVictim(chain, "N1", "N6", 900)
 
 	log.Print(checkBlacklistWithRemovedLatencies(chain, nodeIDs))
 
 }
 
-func TestBlacklist3Liars3Victims(t *testing.T) {
+func TestRandomAttack3(t *testing.T) {
 	N := 9
 
 	chain, nodeIDs := simpleChain(N)
 
 	//Liars: N0, N1, N2
 
-	setLiarAndVictim(chain, "N0", "N3", 25)
-	setLiarAndVictim(chain, "N0", "N4", 25)
+	setLiarAndVictim(chain, "N0", "N3", 250)
+	setLiarAndVictim(chain, "N0", "N4", 75)
 	setLiarAndVictim(chain, "N0", "N5", 25)
-	setLiarAndVictim(chain, "N1", "N3", 25)
-	setLiarAndVictim(chain, "N1", "N4", 25)
-	setLiarAndVictim(chain, "N1", "N5", 25)
-	setLiarAndVictim(chain, "N2", "N3", 25)
-	setLiarAndVictim(chain, "N2", "N4", 25)
-	setLiarAndVictim(chain, "N2", "N5", 25)
+	setLiarAndVictim(chain, "N1", "N3", 5)
+	setLiarAndVictim(chain, "N1", "N4", 500)
+	setLiarAndVictim(chain, "N1", "N5", 35)
+	setLiarAndVictim(chain, "N2", "N3", 16)
+	setLiarAndVictim(chain, "N2", "N4", 0)
+	setLiarAndVictim(chain, "N2", "N5", 5)
 
 	log.Print(checkBlacklistWithRemovedLatencies(chain, nodeIDs))
 
 }
 
-func TestBlacklist15Nodes4Liars5Victims(t *testing.T) {
+func TestRandomAttack4(t *testing.T) {
 	N := 15
 
 	chain, nodeIDs := simpleChain(N)
@@ -91,7 +94,7 @@ func TestBlacklist15Nodes4Liars5Victims(t *testing.T) {
 
 }
 
-func TestBlacklist15Nodes3Liars5Victims(t *testing.T) {
+func TestRandomAttack5(t *testing.T) {
 	N := 15
 
 	chain, nodeIDs := simpleChain(N)
@@ -120,7 +123,7 @@ func TestBlacklist15Nodes3Liars5Victims(t *testing.T) {
 
 }
 
-func TestBlacklist15Nodes4Liars3Victims(t *testing.T) {
+func TestRandomAttack6(t *testing.T) {
 	N := 15
 
 	chain, nodeIDs := simpleChain(N)
@@ -144,7 +147,7 @@ func TestBlacklist15Nodes4Liars3Victims(t *testing.T) {
 
 }
 
-func TestBlacklist15Nodes5Liars3Victims(t *testing.T) {
+func TestRandomAttack7(t *testing.T) {
 	N := 15
 
 	chain, nodeIDs := simpleChain(N)
@@ -170,7 +173,7 @@ func TestBlacklist15Nodes5Liars3Victims(t *testing.T) {
 	log.Print(checkBlacklistWithRemovedLatencies(chain, nodeIDs))
 
 }
-func TestBlacklist15Nodes5Liars1Victim(t *testing.T) {
+func TestRandomAttack8(t *testing.T) {
 	N := 15
 
 	chain, nodeIDs := simpleChain(N)
@@ -185,7 +188,7 @@ func TestBlacklist15Nodes5Liars1Victim(t *testing.T) {
 
 }
 
-func TestBlacklist15Nodes4Liars8Victims(t *testing.T) {
+func TestRandomAttack9(t *testing.T) {
 	N := 15
 
 	chain, nodeIDs := simpleChain(N)
@@ -231,5 +234,44 @@ func TestBlacklist15Nodes4Liars8Victims(t *testing.T) {
 	setLiarAndVictim(chain, "N3", "N12", 25)
 
 	log.Print(checkBlacklistWithRemovedLatencies(chain, nodeIDs))
+
+}
+
+func CreateGraphData(N int, nbLiars int) {
+
+	//1) Create chain with No TIVs or liars
+	consistentChain, _ := consistentChain(N)
+
+	//2) Modify some of the latencies so they might no longer be consistent
+	inconsistentChain := consistentChain.Copy()
+
+	nbLiars = rand.Intn(N / 3)
+
+	for j := 0; j < nbLiars; j++ {
+		n1 := rand.Intn(N)
+		n2 := rand.Intn(N)
+		if n2 == n1 {
+			if n1 > 0 {
+				n2 = (n1 - 1)
+			} else {
+				n2 = (n1 + 1)
+			}
+		}
+
+		oldLatency := int(consistentChain.Blocks[n1].Latencies[numbersToNodes(n2)].Latency.Nanoseconds())
+		newLatency := (oldLatency * rand.Intn(N)) % N
+
+		setLiarAndVictim(inconsistentChain, numbersToNodes(n1), numbersToNodes(n2), time.Duration(newLatency))
+	}
+
+	//3) Create the blacklist of the chain
+	blacklist, _ := CreateBlacklist(inconsistentChain, 0)
+	log.Print(blacklist)
+	//4) Create a graph where each original latency is on the x-axis,
+	//each corresponding latency actually recorded in the chain is on the y-axis,
+	//and if a node at (x,y) is in the blacklist, give it a different color.
+	//=> configure X, Y, Blacklist values for graphing, write to file
+
+	//5) Repeat 1-4 for a new chain with a different number of nodes (edited)
 
 }

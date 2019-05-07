@@ -2,10 +2,10 @@ package latencyprotocol
 
 import (
 	//"go.dedis.ch/onet/v3/log"
-	sigAlg "golang.org/x/crypto/ed25519"
-	"math"
 	"sort"
 	"strconv"
+
+	sigAlg "golang.org/x/crypto/ed25519"
 )
 
 //Blacklistset is a set of public keys corresponding to blacklisted nodes, with the number of Strikes against them
@@ -59,7 +59,7 @@ func (set *Blacklistset) Contains(key sigAlg.PublicKey, thresh int) bool {
 		return false
 	}
 
-	return nbStrikes >= thresh
+	return nbStrikes > thresh
 }
 
 //NumberStrikes give the numeber of Strikes a node got
@@ -67,61 +67,17 @@ func (set *Blacklistset) NumberStrikes(key sigAlg.PublicKey) int {
 	return set.Strikes[string(key)]
 }
 
-//GetBestThreshold calculates the number of strikes most likely to isolate up to a third of highly suspicious nodes
-func (set *Blacklistset) GetBestThreshold() (int, *Blacklistset) {
+//UpperThreshold returns the maximum number of strikes a victim node can get
+func UpperThreshold(N int) int {
+	return (N / 3) * (N - (N / 3) - 1)
 
-	nbStrikes := len(set.Strikes)
-	threshBlacklist := NewBlacklistset()
-
-	if nbStrikes == 0 {
-		return -1, &threshBlacklist
-	}
-
-	strikeMagnitudes := make([]int, 0, nbStrikes)
-	for _, strikeNb := range set.Strikes {
-		strikeMagnitudes = append(strikeMagnitudes, strikeNb)
-	}
-
-	sort.Sort(sort.IntSlice(strikeMagnitudes))
-
-	strikeDiffs := make([]int, 0, int(math.Max(float64(nbStrikes-1), 0)))
-
-	prevStrike := strikeMagnitudes[0]
-	for _, strike := range strikeMagnitudes[1:] {
-		strikeDiffs = append(strikeDiffs, strike-prevStrike)
-		prevStrike = strike
-	}
-
-	thirdSize := int(math.Ceil(float64(nbStrikes / 3)))
-	topThird := strikeDiffs[thirdSize:]
-
-	biggestStrikeDiff := topThird[0]
-	location := 0
-	for i, strikeDiff := range topThird[1:] {
-		if strikeDiff > biggestStrikeDiff {
-			location = i + 1
-			biggestStrikeDiff = strikeDiff
-		}
-	}
-
-	if biggestStrikeDiff == 0 {
-		return -1, &threshBlacklist
-	}
-
-	thresh := strikeMagnitudes[thirdSize+location+1]
-	for key, strikes := range set.Strikes {
-		if strikes >= thresh {
-			threshBlacklist.AddWithStrikes(sigAlg.PublicKey([]byte(key)), strikes)
-		}
-	}
-	return thresh, &threshBlacklist
 }
 
 //GetBlacklistWithThreshold returns a new blacklist containing only the nodes with more than a given threshold of Strikes
 func (set *Blacklistset) GetBlacklistWithThreshold(thresh int) Blacklistset {
 	threshBlacklist := NewBlacklistset()
 	for key, Strikes := range set.Strikes {
-		if Strikes >= thresh {
+		if Strikes > thresh {
 			threshBlacklist.AddWithStrikes(sigAlg.PublicKey([]byte(key)), Strikes)
 		}
 	}
@@ -137,6 +93,11 @@ func (set *Blacklistset) Size() int {
 		}
 	}
 	return size
+}
+
+//IsEmpty returns whether a blacklist is empty
+func (set *Blacklistset) IsEmpty() bool {
+	return set.Size() == 0
 }
 
 //Equals checks if two sets have the same content
@@ -183,6 +144,9 @@ func (set *Blacklistset) NodesEqual(otherset *Blacklistset) bool {
 
 //ToString returns a string format of the Strikes
 func (set *Blacklistset) ToString() string {
+	if set.IsEmpty() {
+		return "Blacklist empty"
+	}
 	str := "\n"
 	for key, val := range set.Strikes {
 		str += key + ": " + strconv.Itoa(val) + "\n"
@@ -193,6 +157,9 @@ func (set *Blacklistset) ToString() string {
 //NodesToString simply print which nodes are blacklisted
 func (set *Blacklistset) NodesToString() string {
 
+	if set.Size() == 0 {
+		return "Blacklist Empty"
+	}
 	keys := make([]string, 0, len(set.Strikes))
 	for key := range set.Strikes {
 		keys = append(keys, key)
@@ -225,7 +192,6 @@ func (set *Blacklistset) PrintDifferencesTo(other *Blacklistset) string {
 			str += key + ": " + strconv.Itoa(val1) + " -> 0\n"
 		}
 	}
-
 	return str
 }
 

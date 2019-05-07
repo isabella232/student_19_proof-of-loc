@@ -3,10 +3,10 @@ package latencyprotocol
 import (
 	"errors"
 	//"go.dedis.ch/onet/v3/log"
-	sigAlg "golang.org/x/crypto/ed25519"
-	"math"
 	"strconv"
 	"time"
+
+	sigAlg "golang.org/x/crypto/ed25519"
 )
 
 const delta = time.Duration(1000 * time.Millisecond)
@@ -237,7 +237,10 @@ type triangle struct {
 //Warning: for now, the following assumptions are made:
 //* all nodes give latencies to all other nodes (except themselves)
 //* all latencies are symmetric (A -> B == B -> A)
-func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int) (Blacklistset, error) {
+func CreateBlacklist(chain *Chain, delta time.Duration) (Blacklistset, error) {
+
+	N := len(chain.Blocks)
+	threshold := UpperThreshold(N)
 
 	triangles := make([]triangle, 0)
 	blockMapper := make(map[string]*Block)
@@ -296,50 +299,6 @@ func (A *Node) CreateBlacklist(chain *Chain, delta time.Duration, threshold int)
 	threshBlacklist := blacklist.GetBlacklistWithThreshold(threshold)
 
 	return threshBlacklist, nil
-
-}
-
-//AverageBlacklists breaks a network of nodes into subnetworks of x (usually 5) nodes to better compute blacklists by splitting up collaborating liars
-func AverageBlacklists(chain *Chain, delta time.Duration, threshold int, subnetSize int) (Blacklistset, error) {
-	blocks := make(map[string]*Block, 0)
-
-	for _, block := range chain.Blocks {
-		blocks[string(block.ID.PublicKey)] = block
-	}
-
-	nbNodes := len(blocks)
-	if nbNodes <= subnetSize {
-		node1 := Node{
-			ID: chain.Blocks[0].ID,
-		}
-		blacklist, _ := node1.CreateBlacklist(chain, delta, threshold)
-		return blacklist, nil
-	}
-	blacklists := make([]*Blacklistset, 0)
-	for key := range blocks {
-		smallerBlockList := make([]*Block, 0)
-		for k, b := range blocks {
-			if k != key {
-				smallerBlockList = append(smallerBlockList, b)
-			}
-		}
-		smallerChain := Chain{smallerBlockList, []byte("")}
-		newBlack, _ := AverageBlacklists(&smallerChain, delta, threshold, subnetSize)
-		blacklists = append(blacklists, &newBlack)
-	}
-
-	nbBlacklists := len(blacklists)
-
-	averagedBlacklist := blacklists[0]
-	for i := 1; i < nbBlacklists; i++ {
-		averagedBlacklist.CombineWith(blacklists[i])
-	}
-
-	for k, strikes := range averagedBlacklist.Strikes {
-		averagedBlacklist.Strikes[k] = int(math.Round(float64(strikes) / float64(nbBlacklists)))
-	}
-
-	return *averagedBlacklist, nil
 
 }
 
