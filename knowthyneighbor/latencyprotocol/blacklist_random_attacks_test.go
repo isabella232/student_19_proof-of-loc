@@ -1,7 +1,10 @@
 package latencyprotocol
 
 import (
+	"fmt"
 	"math/rand"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -269,8 +272,37 @@ func CreateGraphData(N int, nbLiars int) {
 	log.Print(blacklist)
 	//4) Create a graph where each original latency is on the x-axis,
 	//each corresponding latency actually recorded in the chain is on the y-axis,
-	//and if a node at (x,y) is in the blacklist, give it a different color.
+	//and if the nodes at the ends of the latency (x,y) are in the blacklist, give it a different color.
+	// 0, 1 or 2 nodes recorded as blacklisted
 	//=> configure X, Y, Blacklist values for graphing, write to file
+
+	file, err := os.Create("result_with_" + strconv.Itoa(N) + ".csv")
+	if err != nil {
+		log.Fatal("Cannot create file", err)
+	}
+	defer file.Close()
+
+	fmt.Fprintln(file, "true_latency,recorded_latency,blacklist_status,")
+
+	blacklistStatus := 0
+
+	for i := 0; i < N; i++ {
+		if blacklist.ContainsAsString(numbersToNodes(i)) {
+			blacklistStatus++
+		}
+
+		for j := i + 1; j < N; j++ {
+			nodej := numbersToNodes(j)
+			if blacklist.ContainsAsString(nodej) {
+				blacklistStatus++
+			}
+			real := strconv.Itoa(int(consistentChain.Blocks[i].Latencies[nodej].Latency))
+			recorded := strconv.Itoa(int(inconsistentChain.Blocks[i].Latencies[nodej].Latency))
+			status := strconv.Itoa(blacklistStatus)
+			fmt.Fprintln(file, real+","+recorded+","+status+",")
+
+		}
+	}
 
 	//5) Repeat 1-4 for a new chain with a different number of nodes (edited)
 

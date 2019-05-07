@@ -28,7 +28,6 @@ func (set *Blacklistset) Add(key sigAlg.PublicKey) {
 	} else {
 		set.Strikes[string(key)]++
 	}
-
 }
 
 //AddWithStrikesStringKey adds a node's public key as a string to a blacklist a given number of times
@@ -60,6 +59,16 @@ func (set *Blacklistset) Contains(key sigAlg.PublicKey, thresh int) bool {
 	}
 
 	return nbStrikes > thresh
+}
+
+//ContainsAsString check if a node is blacklisted
+func (set *Blacklistset) ContainsAsString(key string) bool {
+	nbStrikes, isPresent := set.Strikes[string(key)]
+	if !isPresent {
+		return false
+	}
+
+	return nbStrikes > 0
 }
 
 //NumberStrikes give the numeber of Strikes a node got
