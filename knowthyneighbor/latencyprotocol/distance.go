@@ -2,7 +2,8 @@ package latencyprotocol
 
 import (
 	"errors"
-	//"go.dedis.ch/onet/v3/log"
+	"log"
+
 	"strconv"
 	"time"
 
@@ -237,12 +238,14 @@ type triangle struct {
 //Warning: for now, the following assumptions are made:
 //* all nodes give latencies to all other nodes (except themselves)
 //* all latencies are symmetric (A -> B == B -> A)
-func CreateBlacklist(chain *Chain, delta time.Duration) (Blacklistset, error) {
+func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool) (Blacklistset, error) {
 
 	N := len(chain.Blocks)
 	threshold := UpperThreshold(N)
 
-	triangles := make([]triangle, 0)
+	if verbose {
+		log.Print("Threshold: " + strconv.Itoa(threshold))
+	}
 	blockMapper := make(map[string]*Block)
 
 	blacklist := NewBlacklistset()
@@ -270,7 +273,7 @@ func CreateBlacklist(chain *Chain, delta time.Duration) (Blacklistset, error) {
 				if CHere {
 
 					for Dstring := range BBlock.Latencies {
-						if Dstring != Cstring && Dstring != Bstring && !triangleAlreadyEvaluated(Bstring, Cstring, Dstring, triangles) {
+						if Dstring != Cstring && Dstring != Bstring {
 							DBlock, DHere := blockMapper[Dstring]
 
 							if DHere {
@@ -279,14 +282,13 @@ func CreateBlacklist(chain *Chain, delta time.Duration) (Blacklistset, error) {
 								BtoC, BtoCHere := BBlock.getLatency(CBlock)
 								CtoD, CtoDHere := CBlock.getLatency(DBlock)
 
-								if BtoDHere && BtoCHere && CtoDHere && !triangleInequality(BtoD, BtoC, CtoD) {
+								if BtoDHere && BtoCHere && CtoDHere && !TriangleInequalitySatisfied(BtoD, BtoC, CtoD) {
 
 									blacklist.Add(sigAlg.PublicKey([]byte(Bstring)))
 									blacklist.Add(sigAlg.PublicKey([]byte(Cstring)))
 									blacklist.Add(sigAlg.PublicKey([]byte(Dstring)))
 								}
 
-								triangles = append(triangles, triangle{Bstring, Cstring, Dstring})
 							}
 						}
 
@@ -296,14 +298,24 @@ func CreateBlacklist(chain *Chain, delta time.Duration) (Blacklistset, error) {
 		}
 	}
 
+	if verbose {
+		log.Print("Before Thresholding: ")
+		log.Print(blacklist.ToStringFake())
+	}
+
 	threshBlacklist := blacklist.GetBlacklistWithThreshold(threshold)
+
+	if verbose {
+		log.Print("After Thresholding: ")
+		log.Print(threshBlacklist.ToStringFake())
+	}
 
 	return threshBlacklist, nil
 
 }
 
-// a+b>c, a+c>b, b+c > a
-func triangleInequality(latAB time.Duration, latBC time.Duration, latCA time.Duration) bool {
+//TriangleInequalitySatisfied returns whether the triangle inequality theorem is satisfied
+func TriangleInequalitySatisfied(latAB time.Duration, latBC time.Duration, latCA time.Duration) bool {
 	return latAB+latBC >= latCA && latAB+latCA >= latBC && latBC+latCA >= latAB
 }
 

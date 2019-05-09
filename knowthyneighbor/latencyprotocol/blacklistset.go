@@ -2,6 +2,7 @@ package latencyprotocol
 
 import (
 	//"go.dedis.ch/onet/v3/log"
+
 	"sort"
 	"strconv"
 
@@ -78,7 +79,10 @@ func (set *Blacklistset) NumberStrikes(key sigAlg.PublicKey) int {
 
 //UpperThreshold returns the maximum number of strikes a victim node can get
 func UpperThreshold(N int) int {
-	return (N / 3) * (N - (N / 3) - 1)
+	third := float64(N) / 3
+	return int((third)*float64(N-1)) * 6
+	//Multiply by 6 because that's how often a triangle will be tested
+	//return (N / 3) * (N - (N / 3) - 1)
 
 }
 
@@ -97,7 +101,7 @@ func (set *Blacklistset) GetBlacklistWithThreshold(thresh int) Blacklistset {
 func (set *Blacklistset) Size() int {
 	size := 0
 	for _, nbStrikes := range set.Strikes {
-		if nbStrikes != 0 {
+		if nbStrikes > 0 {
 			size++
 		}
 	}
@@ -106,7 +110,7 @@ func (set *Blacklistset) Size() int {
 
 //IsEmpty returns whether a blacklist is empty
 func (set *Blacklistset) IsEmpty() bool {
-	return set.Size() == 0
+	return set.Size() <= 0
 }
 
 //Equals checks if two sets have the same content
@@ -154,11 +158,39 @@ func (set *Blacklistset) NodesEqual(otherset *Blacklistset) bool {
 //ToString returns a string format of the Strikes
 func (set *Blacklistset) ToString() string {
 	if set.IsEmpty() {
-		return "Blacklist empty"
+		return "Blacklist empty\n"
 	}
+
+	keys := make([]string, 0, len(set.Strikes))
+	for key := range set.Strikes {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
 	str := "\n"
-	for key, val := range set.Strikes {
-		str += key + ": " + strconv.Itoa(val) + "\n"
+	for _, key := range keys {
+		val := set.Strikes[key]
+		if val > 0 {
+			str += key + ": " + strconv.Itoa(val) + "\n"
+		}
+	}
+	return str
+}
+
+//ToStringFake returns a string format of the Strikes of an artificial network
+func (set *Blacklistset) ToStringFake() string {
+	if set.IsEmpty() {
+		return "Blacklist empty\n"
+	}
+
+	str := "\n"
+	for i := 0; i < len(set.Strikes); i++ {
+		key := "N" + strconv.Itoa(i)
+		val := set.Strikes[key]
+		if val > 0 {
+			str += key + ": " + strconv.Itoa(val) + "\n"
+		}
 	}
 	return str
 }
