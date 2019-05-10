@@ -14,14 +14,14 @@ import (
 
 func TestGraphCreation(t *testing.T) {
 
-	/*log.Print("100")
+	log.Print("100")
 
-	err := CreateGraphData(100, 33, "test_100_nodes_attack_all")
+	err := CreateGraphData(100, 33, "test_100_nodes_attack_all_outrageous")
 	if err != nil {
 		log.Print(err)
-	}*/
+	}
 
-	log.Print("200")
+	/*log.Print("200")
 
 	err := CreateGraphData(200, 66, "test")
 	if err != nil {
@@ -76,7 +76,7 @@ func CreateGraphData(N int, nbLiars int, filename string) error {
 	inconsistentChain := consistentChain.Copy()
 	log.Print("Copied Consistent Graph")
 
-	//All liars target 1 victim
+	/*//All liars target 1 victim
 	victim := nbLiars
 	for n1 := 0; n1 < nbLiars; n1++ {
 		oldLatency := int(consistentChain.Blocks[n1].Latencies[numbersToNodes(victim)].Latency.Nanoseconds())
@@ -94,9 +94,9 @@ func CreateGraphData(N int, nbLiars int, filename string) error {
 
 		setLiarAndVictim(inconsistentChain, numbersToNodes(n1), numbersToNodes(victim), time.Duration(newLatency))
 
-	}
+	}*/
 
-	/*for n1 := 0; n1 < nbLiars; n1++ {
+	for n1 := 0; n1 < nbLiars; n1++ {
 
 		log.Print("Liar: " + numbersToNodes(n1))
 
@@ -108,7 +108,9 @@ func CreateGraphData(N int, nbLiars int, filename string) error {
 
 				var newLatency int
 				//coordinated attack: newLatency = oldlatency + 7000
-				adder := rand.Intn(7000)
+				//adder := rand.Intn(7000)
+				//outrageous lies:
+				adder := rand.Intn(20000)
 				sign := rand.Intn(2)
 
 				if sign == 0 && oldLatency > adder {
@@ -120,7 +122,7 @@ func CreateGraphData(N int, nbLiars int, filename string) error {
 				setLiarAndVictim(inconsistentChain, numbersToNodes(n1), numbersToNodes(n2), time.Duration(newLatency))
 			}
 		}
-	}*/
+	}
 
 	log.Print("Lies set")
 

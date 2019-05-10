@@ -1,7 +1,7 @@
 N: 100
 liars: 33 (N0 -> N32)
 
-threshold:
+threshold: 19800
 
 Strike list:
 N0: 15375
