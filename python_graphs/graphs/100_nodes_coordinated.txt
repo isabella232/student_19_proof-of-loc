@@ -1,0 +1,5 @@
+N: 100
+liars: 33
+threshold: 19880
+
+Strikelists: empty

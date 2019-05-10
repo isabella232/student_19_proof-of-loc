@@ -238,10 +238,13 @@ type triangle struct {
 //Warning: for now, the following assumptions are made:
 //* all nodes give latencies to all other nodes (except themselves)
 //* all latencies are symmetric (A -> B == B -> A)
-func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool) (Blacklistset, error) {
+func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool, threshGiven bool, threshold int) (Blacklistset, error) {
 
 	N := len(chain.Blocks)
-	threshold := UpperThreshold(N)
+
+	if !threshGiven {
+		threshold = UpperThreshold(N)
+	}
 
 	if verbose {
 		log.Print("Threshold: " + strconv.Itoa(threshold))
@@ -282,7 +285,7 @@ func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool) (Blacklist
 								BtoC, BtoCHere := BBlock.getLatency(CBlock)
 								CtoD, CtoDHere := CBlock.getLatency(DBlock)
 
-								if BtoDHere && BtoCHere && CtoDHere && !TriangleInequalitySatisfied(BtoD, BtoC, CtoD) {
+								if BtoDHere && BtoCHere && CtoDHere && !TriangleInequalitySatisfiedInt(int(BtoD), int(BtoC), int(CtoD)) {
 
 									blacklist.Add(sigAlg.PublicKey([]byte(Bstring)))
 									blacklist.Add(sigAlg.PublicKey([]byte(Cstring)))
@@ -316,6 +319,11 @@ func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool) (Blacklist
 
 //TriangleInequalitySatisfied returns whether the triangle inequality theorem is satisfied
 func TriangleInequalitySatisfied(latAB time.Duration, latBC time.Duration, latCA time.Duration) bool {
+	return latAB+latBC >= latCA && latAB+latCA >= latBC && latBC+latCA >= latAB
+}
+
+//TriangleInequalitySatisfiedInt returns whether the triangle inequality theorem is satisfied
+func TriangleInequalitySatisfiedInt(latAB int, latBC int, latCA int) bool {
 	return latAB+latBC >= latCA && latAB+latCA >= latBC && latBC+latCA >= latAB
 }
 

@@ -24,7 +24,7 @@ func TestBlacklistOneLiar(t *testing.T) {
 
 	for index := range nodeIDs {
 
-		blacklist, err := CreateBlacklist(chain, d, false)
+		blacklist, err := CreateBlacklist(chain, d, false, false, -1)
 
 		blacklists[index] = blacklist
 
@@ -90,7 +90,7 @@ func TestBlacklistTwoLiars(t *testing.T) {
 
 	for index := range nodeIDs {
 
-		blacklist, err := CreateBlacklist(chain, d, false)
+		blacklist, err := CreateBlacklist(chain, d, false, false, -1)
 
 		blacklists[index] = blacklist
 
