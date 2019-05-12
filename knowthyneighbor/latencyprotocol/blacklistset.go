@@ -242,3 +242,12 @@ func (set *Blacklistset) CombineWith(other *Blacklistset) {
 		set.AddWithStrikesStringKey(k, v)
 	}
 }
+
+//NbStrikesOf returns the number of strikes of a given node
+func (set *Blacklistset) NbStrikesOf(node string) int {
+	strikes, exists := set.Strikes[node]
+	if !exists {
+		return 0
+	}
+	return strikes
+}

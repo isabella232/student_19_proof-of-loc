@@ -3,6 +3,7 @@ package latencyprotocol
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"strconv"
@@ -16,7 +17,7 @@ func TestGraphCreation(t *testing.T) {
 
 	log.Print("100")
 
-	err := CreateGraphData(100, 33, "test_100_nodes_attack_all_outrageous")
+	err := CreatePercentageGraphData(100, 33, "test_100_nodes_attack_all_outrageous")
 	if err != nil {
 		log.Print(err)
 	}
@@ -57,7 +58,104 @@ func TestGraphCreation(t *testing.T) {
 
 }
 
-func CreateGraphData(N int, nbLiars int, filename string) error {
+func CreateLinearGraphData(N int, nbLiars int, filename string) error {
+
+	consistentChain, inconsistentChain, blacklist, err := createHonestAndLyingNetworks(N, nbLiars)
+
+	if err != nil {
+		return err
+	}
+
+	//4) Create a graph where each original latency is on the x-axis,
+	//each corresponding latency actually recorded in the chain is on the y-axis,
+	//and if the nodes at the ends of the latency (x,y) are in the blacklist, give it a different color.
+	// 0, 1 or 2 nodes recorded as blacklisted
+	//=> configure X, Y, Blacklist values for graphing, write to file
+
+	file, err := os.Create("../../python_graphs/data/linear/" + filename + ".csv")
+	if err != nil {
+		log.Fatal("Cannot create file", err)
+	}
+	defer file.Close()
+
+	fmt.Fprintln(file, "true_latency,recorded_latency,blacklist_status")
+
+	for i := 0; i < N; i++ {
+		blacklistStatusBlock := 0
+		if blacklist.ContainsAsString(numbersToNodes(i)) {
+			blacklistStatusBlock++
+		}
+
+		for j := i + 1; j < N; j++ {
+			blacklistStatus := 0
+			nodej := numbersToNodes(j)
+			if blacklist.ContainsAsString(nodej) {
+				blacklistStatus++
+			}
+			real := strconv.Itoa(int(consistentChain.Blocks[i].Latencies[nodej].Latency))
+			recorded := strconv.Itoa(int(inconsistentChain.Blocks[i].Latencies[nodej].Latency))
+			status := strconv.Itoa(blacklistStatus + blacklistStatusBlock)
+			fmt.Fprintln(file, real+","+recorded+","+status)
+
+		}
+	}
+
+	//5) Repeat 1-4 for a new chain with a different number of nodes (edited)
+	return nil
+
+}
+
+func CreatePercentageGraphData(N int, nbLiars int, filename string) error {
+
+	//4) Create a graph where each original latency is on the x-axis,
+	//each corresponding latency actually recorded in the chain is on the y-axis,
+	//and if the nodes at the ends of the latency (x,y) are in the blacklist, give it a different color.
+	// 0, 1 or 2 nodes recorded as blacklisted
+	//=> configure X, Y, Blacklist values for graphing, write to file
+
+	consistentChain, inconsistentChain, blacklist, err := createHonestAndLyingNetworks(N, nbLiars)
+	threshold := strconv.Itoa(UpperThreshold(N))
+
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create("../../python_graphs/data/percentage/" + filename + ".csv")
+	if err != nil {
+		log.Fatal("Cannot create file", err)
+	}
+	defer file.Close()
+
+	fmt.Fprintln(file, "lie_percentage,nb_strikes,blacklist_status,threshold")
+
+	for i := 0; i < N; i++ {
+		blacklistStatusBlock := 0
+		if blacklist.ContainsAsString(numbersToNodes(i)) {
+			blacklistStatusBlock++
+		}
+
+		for j := i + 1; j < N; j++ {
+			blacklistStatus := 0
+			nodej := numbersToNodes(j)
+			if blacklist.ContainsAsString(nodej) {
+				blacklistStatus++
+			}
+			real := int(consistentChain.Blocks[i].Latencies[nodej].Latency)
+			recorded := int(inconsistentChain.Blocks[i].Latencies[nodej].Latency)
+			percentage := strconv.FormatFloat(math.Abs(float64(recorded-real))/float64(real), 'f', 2, 64)
+			nbStrikes := strconv.Itoa(blacklist.NbStrikesOf(nodej))
+			status := strconv.Itoa(blacklistStatus + blacklistStatusBlock)
+			fmt.Fprintln(file, percentage+","+nbStrikes+","+status+","+threshold)
+
+		}
+	}
+
+	//5) Repeat 1-4 for a new chain with a different number of nodes (edited)
+	return nil
+
+}
+
+func createHonestAndLyingNetworks(N int, nbLiars int) (*Chain, *Chain, *Blacklistset, error) {
 
 	//1) Create chain with No TIVs or liars
 	consistentChain, _ := consistentChain(N)
@@ -69,7 +167,7 @@ func CreateGraphData(N int, nbLiars int, filename string) error {
 
 	if !testBlacklist.IsEmpty() {
 		log.Print(testBlacklist.ToString())
-		return errors.New("Original graph has triangle inequality violations")
+		return nil, nil, nil, errors.New("Original graph has triangle inequality violations")
 	}
 
 	//2) Modify some of the latencies so they might no longer be consistent
@@ -129,45 +227,8 @@ func CreateGraphData(N int, nbLiars int, filename string) error {
 	//3) Create the blacklist of the chain
 	blacklist, _ := CreateBlacklist(inconsistentChain, 0, true, false, -1)
 
-	print(blacklist.ToStringFake())
-
 	log.Print("Create blacklist")
 
-	//4) Create a graph where each original latency is on the x-axis,
-	//each corresponding latency actually recorded in the chain is on the y-axis,
-	//and if the nodes at the ends of the latency (x,y) are in the blacklist, give it a different color.
-	// 0, 1 or 2 nodes recorded as blacklisted
-	//=> configure X, Y, Blacklist values for graphing, write to file
-
-	file, err := os.Create("../../python_graphs/data/" + filename + ".csv")
-	if err != nil {
-		log.Fatal("Cannot create file", err)
-	}
-	defer file.Close()
-
-	fmt.Fprintln(file, "true_latency,recorded_latency,blacklist_status")
-
-	for i := 0; i < N; i++ {
-		blacklistStatusBlock := 0
-		if blacklist.ContainsAsString(numbersToNodes(i)) {
-			blacklistStatusBlock++
-		}
-
-		for j := i + 1; j < N; j++ {
-			blacklistStatus := 0
-			nodej := numbersToNodes(j)
-			if blacklist.ContainsAsString(nodej) {
-				blacklistStatus++
-			}
-			real := strconv.Itoa(int(consistentChain.Blocks[i].Latencies[nodej].Latency))
-			recorded := strconv.Itoa(int(inconsistentChain.Blocks[i].Latencies[nodej].Latency))
-			status := strconv.Itoa(blacklistStatus + blacklistStatusBlock)
-			fmt.Fprintln(file, real+","+recorded+","+status)
-
-		}
-	}
-
-	//5) Repeat 1-4 for a new chain with a different number of nodes (edited)
-	return nil
+	return consistentChain, inconsistentChain, &blacklist, nil
 
 }
