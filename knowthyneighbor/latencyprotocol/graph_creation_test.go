@@ -15,46 +15,10 @@ import (
 
 func TestGraphCreation(t *testing.T) {
 
-	log.Print("100")
-
-	err := CreatePercentageGraphData(100, 33, "test_100_nodes_attack_all_outrageous")
+	err := CreatePercentageGraphData(100, 33, "test_100_nodes_random")
 	if err != nil {
 		log.Print(err)
 	}
-
-	/*log.Print("200")
-
-	err := CreateGraphData(200, 66, "test")
-	if err != nil {
-		log.Print(err)
-	}
-
-	/*log.Print("500")
-
-	err = CreateGraphData(500, 166, "test_500_nodes_attack_all")
-	if err != nil {
-		log.Print(err)
-	}
-
-	/*err = CreateGraphData(1000, 333, "test_1000_nodes")
-	if err != nil {
-		log.Print(err)
-	}
-
-	err = CreateGraphData(2000, 666, "test_2000_nodes")
-	if err != nil {
-		log.Print(err)
-	}
-
-	err = CreateGraphData(3000, 1000, "test_3000_nodes")
-	if err != nil {
-		log.Print(err)
-	}
-
-	err = CreateGraphData(5000, 1666, "test_5000_nodes")
-	if err != nil {
-		log.Print(err)
-	}*/
 
 }
 
@@ -114,7 +78,8 @@ func CreatePercentageGraphData(N int, nbLiars int, filename string) error {
 	//=> configure X, Y, Blacklist values for graphing, write to file
 
 	consistentChain, inconsistentChain, blacklist, err := createHonestAndLyingNetworks(N, nbLiars)
-	threshold := strconv.Itoa(UpperThreshold(N))
+	thresh := UpperThreshold(N)
+	threshold := strconv.Itoa(thresh)
 
 	if err != nil {
 		return err
@@ -126,26 +91,21 @@ func CreatePercentageGraphData(N int, nbLiars int, filename string) error {
 	}
 	defer file.Close()
 
-	fmt.Fprintln(file, "lie_percentage,nb_strikes,blacklist_status,threshold")
+	fmt.Fprintln(file, "node_1,node_2,lie_percentage,nb_strikes_1,nb_strikes_2,threshold")
 
 	for i := 0; i < N; i++ {
-		blacklistStatusBlock := 0
-		if blacklist.ContainsAsString(numbersToNodes(i)) {
-			blacklistStatusBlock++
-		}
+		nodei := numbersToNodes(i)
 
-		for j := i + 1; j < N; j++ {
-			blacklistStatus := 0
-			nodej := numbersToNodes(j)
-			if blacklist.ContainsAsString(nodej) {
-				blacklistStatus++
+		for j := 0; j < N; j++ {
+			if i != j {
+				nodej := numbersToNodes(j)
+				real := int(consistentChain.Blocks[i].Latencies[nodej].Latency)
+				recorded := int(inconsistentChain.Blocks[i].Latencies[nodej].Latency)
+				percentage := strconv.FormatFloat(math.Abs(float64(recorded-real))/float64(real), 'f', 2, 64)
+				nbStrikes1 := strconv.Itoa(blacklist.NbStrikesOf(nodei))
+				nbStrikes2 := strconv.Itoa(blacklist.NbStrikesOf(nodej))
+				fmt.Fprintln(file, nodei+","+nodej+","+percentage+","+nbStrikes1+","+nbStrikes2+","+threshold)
 			}
-			real := int(consistentChain.Blocks[i].Latencies[nodej].Latency)
-			recorded := int(inconsistentChain.Blocks[i].Latencies[nodej].Latency)
-			percentage := strconv.FormatFloat(math.Abs(float64(recorded-real))/float64(real), 'f', 2, 64)
-			nbStrikes := strconv.Itoa(blacklist.NbStrikesOf(nodej))
-			status := strconv.Itoa(blacklistStatus + blacklistStatusBlock)
-			fmt.Fprintln(file, percentage+","+nbStrikes+","+status+","+threshold)
 
 		}
 	}
@@ -199,16 +159,16 @@ func createHonestAndLyingNetworks(N int, nbLiars int) (*Chain, *Chain, *Blacklis
 		log.Print("Liar: " + numbersToNodes(n1))
 
 		//liars not attacking each other: n2 := nbLiars
-		for n2 := 0; n2 < N; n2++ {
+		for n2 := nbLiars; n2 < N; n2++ {
 			if n1 != n2 {
 
 				oldLatency := int(consistentChain.Blocks[n1].Latencies[numbersToNodes(n2)].Latency.Nanoseconds())
 
 				var newLatency int
-				//coordinated attack: newLatency = oldlatency + 7000
-				//adder := rand.Intn(7000)
+				//coordinated attack: newLatency = oldLatency + 7000
+				adder := rand.Intn(7000)
 				//outrageous lies:
-				adder := rand.Intn(20000)
+				//adder := rand.Intn(20000)
 				sign := rand.Intn(2)
 
 				if sign == 0 && oldLatency > adder {
@@ -225,7 +185,7 @@ func createHonestAndLyingNetworks(N int, nbLiars int) (*Chain, *Chain, *Blacklis
 	log.Print("Lies set")
 
 	//3) Create the blacklist of the chain
-	blacklist, _ := CreateBlacklist(inconsistentChain, 0, true, false, -1)
+	blacklist, _ := CreateBlacklist(inconsistentChain, 0, true, true, 0)
 
 	log.Print("Create blacklist")
 

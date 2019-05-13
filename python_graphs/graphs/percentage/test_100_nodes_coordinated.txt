@@ -1,0 +1,10 @@
+N = 100
+nbLiars = 33
+
+Threshold: 19800
+
+Before Thresholding: 
+Blacklist empty
+
+After Thresholding: 
+Blacklist empty
