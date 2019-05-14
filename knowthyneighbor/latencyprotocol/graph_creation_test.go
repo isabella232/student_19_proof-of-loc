@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/rand"
 	"os"
 	"strconv"
 	"testing"
@@ -15,7 +14,7 @@ import (
 
 func TestGraphCreation(t *testing.T) {
 
-	err := CreatePercentageGraphData(100, 33, "test_100_nodes_random")
+	err := CreatePercentageGraphData(200, 66, "test_200_nodes_1_victim_coordinated")
 	if err != nil {
 		log.Print(err)
 	}
@@ -134,27 +133,28 @@ func createHonestAndLyingNetworks(N int, nbLiars int) (*Chain, *Chain, *Blacklis
 	inconsistentChain := consistentChain.Copy()
 	log.Print("Copied Consistent Graph")
 
-	/*//All liars target 1 victim
+	//All liars target 1 victim
 	victim := nbLiars
 	for n1 := 0; n1 < nbLiars; n1++ {
 		oldLatency := int(consistentChain.Blocks[n1].Latencies[numbersToNodes(victim)].Latency.Nanoseconds())
 
 		var newLatency int
-		//coordinated attack: newLatency = oldLatency + 7000
-		adder := rand.Intn(7000)
+		//coordinated attack:
+		newLatency = oldLatency + 7000
+		/*adder := rand.Intn(7000)
 		sign := rand.Intn(2)
 
 		if sign == 0 && oldLatency > adder {
 			newLatency = (oldLatency - adder)
 		} else {
 			newLatency = (oldLatency + adder)
-		}
+		}*/
 
 		setLiarAndVictim(inconsistentChain, numbersToNodes(n1), numbersToNodes(victim), time.Duration(newLatency))
 
-	}*/
+	}
 
-	for n1 := 0; n1 < nbLiars; n1++ {
+	/*for n1 := 0; n1 < nbLiars; n1++ {
 
 		log.Print("Liar: " + numbersToNodes(n1))
 
@@ -165,11 +165,13 @@ func createHonestAndLyingNetworks(N int, nbLiars int) (*Chain, *Chain, *Blacklis
 				oldLatency := int(consistentChain.Blocks[n1].Latencies[numbersToNodes(n2)].Latency.Nanoseconds())
 
 				var newLatency int
-				//coordinated attack: newLatency = oldLatency + 7000
-				adder := rand.Intn(7000)
-				//outrageous lies:
-				//adder := rand.Intn(20000)
-				sign := rand.Intn(2)
+				//coordinated attack:
+				newLatency = oldLatency + 7000
+				//adder := rand.Intn(7000)
+				//outrageous lies: adder := rand.Intn(20000)
+				//very outrageous lies: adder := rand.Intn(100000)
+
+				/*sign := rand.Intn(2)
 
 				if sign == 0 && oldLatency > adder {
 					newLatency = (oldLatency - adder)
@@ -180,7 +182,7 @@ func createHonestAndLyingNetworks(N int, nbLiars int) (*Chain, *Chain, *Blacklis
 				setLiarAndVictim(inconsistentChain, numbersToNodes(n1), numbersToNodes(n2), time.Duration(newLatency))
 			}
 		}
-	}
+	}*/
 
 	log.Print("Lies set")
 
