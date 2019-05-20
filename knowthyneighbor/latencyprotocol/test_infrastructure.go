@@ -121,6 +121,16 @@ func numbersToNodes(n int) string {
 	return "N" + strconv.Itoa(n)
 }
 
+func numberArrayToNodeArray(numbers []int) []string {
+	nbNodes := len(numbers)
+	nodes := make([]string, nbNodes)
+	for i := 0; i < nbNodes; i++ {
+		nodes[i] = numbersToNodes(numbers[i])
+
+	}
+	return nodes
+}
+
 func nodesToNumbers(node string) int {
 	nb, _ := strconv.Atoi(string(node[1:]))
 	return nb
@@ -404,4 +414,46 @@ func contains(s []sigAlg.PublicKey, e sigAlg.PublicKey) bool {
 		}
 	}
 	return false
+}
+
+func makeRange(smallerThan int) []int {
+	a := make([]int, smallerThan)
+	for i := range a {
+		a[i] = i
+	}
+	return a
+}
+
+func getSubsets(superSet []int, k int, idx int, current []int, solution [][]int) [][]int {
+	if len(current) == k {
+		solution = append(solution, current)
+		return solution
+	}
+	if idx == len(superSet) {
+		return solution
+	}
+	x := superSet[idx]
+	current = append(current, x)
+	solution = getSubsets(superSet, k, idx+1, current, solution)
+	current = current[:len(current)-1]
+	solution = getSubsets(superSet, k, idx+1, current, solution)
+	return solution
+}
+
+/**
+public static List<Set<Integer>> getSubsets(List<Integer> superSet, int k) {
+    List<Set<Integer>> res = new ArrayList<>();
+    getSubsets(superSet, k, 0, new HashSet<Integer>(), res);
+    return res;
+}
+**/
+
+// Get_M_subsets_of_K_liars_out_of_N_nodes does exactly what the name says with numbers as nodes
+func Get_M_subsets_of_K_liars_out_of_N_nodes(M int, K int, N int) [][]int {
+	superSet := makeRange(N)
+	current := make([]int, 0)
+	solution := make([][]int, 0)
+	solution = getSubsets(superSet, K, 0, current, solution)
+
+	return solution[:M]
 }

@@ -2,11 +2,13 @@ package latencyprotocol
 
 import (
 	"errors"
+
 	"github.com/dedis/student_19_proof-of-loc/knowthyneighbor/udp"
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
 	"go.dedis.ch/onet/v3/network"
+
 	//sigAlg "golang.org/x/crypto/ed25519"
 	"math/rand"
 	"sync"

@@ -1,0 +1,250 @@
+Running tool: /usr/bin/go test -timeout 30s github.com/dedis/student_19_proof-of-loc/knowthyneighbor/latencyprotocol -run ^(TestGraphCreation)$ -v
+
+=== RUN   TestGraphCreation
+I : (latencyprotocol.createHonestAndLyingNetworks: 122) - Created Consistent Graph
+I : (latencyprotocol.createHonestAndLyingNetworks: 126) - Created Blacklist for consistent
+I : (latencyprotocol.createHonestAndLyingNetworks: 135) - Copied Consistent Graph
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N0
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N1
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N2
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N3
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N4
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N5
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N6
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N7
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N8
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N9
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N10
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N11
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N12
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N13
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N14
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N15
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N16
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N17
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N18
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N19
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N20
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N21
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N22
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N23
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N24
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N25
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N26
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N27
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N28
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N29
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N30
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N31
+I : (latencyprotocol.createHonestAndLyingNetworks: 160) - Liar: N32
+I : (latencyprotocol.createHonestAndLyingNetworks: 188) - Lies set
+2019/05/16 16:06:15 Threshold: 0
+2019/05/16 16:06:15 Before Thresholding: 
+2019/05/16 16:06:15 
+N0: 25401
+N1: 25299
+N2: 25353
+N3: 25365
+N4: 25335
+N5: 25446
+N6: 25386
+N7: 25374
+N8: 25305
+N9: 25359
+N10: 25449
+N11: 25425
+N12: 25455
+N13: 25404
+N14: 25425
+N15: 25317
+N16: 25335
+N17: 25374
+N18: 25326
+N19: 25443
+N20: 25428
+N21: 25251
+N22: 25386
+N23: 25203
+N24: 25269
+N25: 25287
+N26: 25347
+N27: 25377
+N28: 25356
+N29: 25218
+N30: 25359
+N31: 25476
+N32: 25467
+N33: 15828
+N34: 15714
+N35: 15864
+N36: 15771
+N37: 15825
+N38: 15831
+N39: 15780
+N40: 15834
+N41: 15726
+N42: 15774
+N43: 15669
+N44: 15666
+N45: 15699
+N46: 15744
+N47: 15777
+N48: 15756
+N49: 15792
+N50: 15795
+N51: 15738
+N52: 15774
+N53: 15795
+N54: 15741
+N55: 15792
+N56: 15765
+N57: 15654
+N58: 15777
+N59: 15792
+N60: 15633
+N61: 15726
+N62: 15651
+N63: 15795
+N64: 15822
+N65: 15789
+N66: 15675
+N67: 15720
+N68: 15687
+N69: 15753
+N70: 15813
+N71: 15813
+N72: 15693
+N73: 15819
+N74: 15738
+N75: 15726
+N76: 15804
+N77: 15807
+N78: 15747
+N79: 15876
+N80: 15747
+N81: 15687
+N82: 15771
+N83: 15750
+N84: 15699
+N85: 15747
+N86: 15717
+N87: 15705
+N88: 15813
+N89: 15750
+N90: 15756
+N91: 15741
+N92: 15720
+N93: 15846
+N94: 15756
+N95: 15777
+N96: 15729
+N97: 15750
+N98: 15876
+N99: 15747
+2019/05/16 16:06:15 After Thresholding: 
+2019/05/16 16:06:15 
+N0: 25401
+N1: 25299
+N2: 25353
+N3: 25365
+N4: 25335
+N5: 25446
+N6: 25386
+N7: 25374
+N8: 25305
+N9: 25359
+N10: 25449
+N11: 25425
+N12: 25455
+N13: 25404
+N14: 25425
+N15: 25317
+N16: 25335
+N17: 25374
+N18: 25326
+N19: 25443
+N20: 25428
+N21: 25251
+N22: 25386
+N23: 25203
+N24: 25269
+N25: 25287
+N26: 25347
+N27: 25377
+N28: 25356
+N29: 25218
+N30: 25359
+N31: 25476
+N32: 25467
+N33: 15828
+N34: 15714
+N35: 15864
+N36: 15771
+N37: 15825
+N38: 15831
+N39: 15780
+N40: 15834
+N41: 15726
+N42: 15774
+N43: 15669
+N44: 15666
+N45: 15699
+N46: 15744
+N47: 15777
+N48: 15756
+N49: 15792
+N50: 15795
+N51: 15738
+N52: 15774
+N53: 15795
+N54: 15741
+N55: 15792
+N56: 15765
+N57: 15654
+N58: 15777
+N59: 15792
+N60: 15633
+N61: 15726
+N62: 15651
+N63: 15795
+N64: 15822
+N65: 15789
+N66: 15675
+N67: 15720
+N68: 15687
+N69: 15753
+N70: 15813
+N71: 15813
+N72: 15693
+N73: 15819
+N74: 15738
+N75: 15726
+N76: 15804
+N77: 15807
+N78: 15747
+N79: 15876
+N80: 15747
+N81: 15687
+N82: 15771
+N83: 15750
+N84: 15699
+N85: 15747
+N86: 15717
+N87: 15705
+N88: 15813
+N89: 15750
+N90: 15756
+N91: 15741
+N92: 15720
+N93: 15846
+N94: 15756
+N95: 15777
+N96: 15729
+N97: 15750
+N98: 15876
+N99: 15747
+I : (latencyprotocol.createHonestAndLyingNetworks: 193) - Create blacklist
+--- PASS: TestGraphCreation (0.57s)
+PASS
+ok  	github.com/dedis/student_19_proof-of-loc/knowthyneighbor/latencyprotocol	0.601s
+Success: Tests passed.
