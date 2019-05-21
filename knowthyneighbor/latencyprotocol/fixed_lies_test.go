@@ -9,7 +9,6 @@ Two sets of experiments: one where liar sets are random, one where liers within 
 */
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -38,7 +37,7 @@ func TestFixedLieRandomLiarGraphCreation(t *testing.T) {
 	nbNodes := 100
 	nbLiars := 33
 
-	nbLiarCombinations := 1
+	nbLiarCombinations := 100
 
 	graphDesign := &GraphDesign{nbNodes, nbLiars, nbNodes, 500, 1000, lowerBoundLies, upperBoundLies}
 
@@ -65,16 +64,16 @@ func CreateFixedLiePercentageGraphData(filename string, randomLiars bool, liarSe
 	consistentChain, _ := consistentChain(N)
 	log.Print("Created Consistent Graph")
 
-	testBlacklist, _ := CreateBlacklist(consistentChain, 0, false, true, 0)
+	/*testBlacklist, _ := CreateBlacklist(consistentChain, 0, false, true, 0)
 
 	log.Print("Created Blacklist for consistent")
 
 	if !testBlacklist.IsEmpty() {
 		log.Print(testBlacklist.ToString())
 		return errors.New("Original graph has triangle inequality violations")
-	}
+	}*/
 
-	file, err := os.Create("../../python_graphs/data/percentage/" + filename + ".csv")
+	file, err := os.Create("../../python_graphs/data/fixed_lies/" + filename + ".csv")
 	if err != nil {
 		log.Fatal("Cannot create file", err)
 	}
@@ -82,11 +81,15 @@ func CreateFixedLiePercentageGraphData(filename string, randomLiars bool, liarSe
 
 	fmt.Fprintln(file, "node,is_liar,is_blacklisted")
 
+	lies := GetLies(graphDesign.NbLiars, graphDesign.NbVictims, graphDesign.LowerBoundLies, graphDesign.UpperBoundLies)
+
 	for _, liarSet := range liarSets {
 
-		_, blacklist := createLyingNetwork(liarSet, graphDesign, consistentChain)
-		//thresh := UpperThreshold(N)
+		_, unthreshedBlacklist := createLyingNetwork(&liarSet, graphDesign, consistentChain, &lies)
+		thresh := UpperThreshold(N)
 		//threshold := strconv.Itoa(thresh)
+
+		blacklist := unthreshedBlacklist.GetBlacklistWithThreshold(thresh)
 
 		if err != nil {
 			return err
@@ -117,15 +120,13 @@ func containsNodeWithID(s []int, e int) bool {
 	return false
 }
 
-func createLyingNetwork(liarSet []int, graphDesign *GraphDesign, consistentChain *Chain) (*Chain, *Blacklistset) {
+func createLyingNetwork(liarSet *([]int), graphDesign *GraphDesign, consistentChain *Chain, lies *([]int)) (*Chain, *Blacklistset) {
 
 	N := graphDesign.NbNodes
 
 	//2) Modify some of the latencies so they might no longer be consistent
 	inconsistentChain := consistentChain.Copy()
 	log.Print("Copied Consistent Graph")
-
-	lies := GetLies(graphDesign.NbLiars, graphDesign.NbVictims, graphDesign.LowerBoundLies, graphDesign.UpperBoundLies)
 
 	//All liars target 1 victim
 	/*victim := nbLiars
@@ -139,15 +140,19 @@ func createLyingNetwork(liarSet []int, graphDesign *GraphDesign, consistentChain
 
 	}*/
 
-	for _, n1 := range liarSet {
-
-		log.Print("Liar: " + numbersToNodes(n1))
+	//println("Size lies: " + strconv.Itoa(len(*lies)))
+	//println("Size liar set: " + strconv.Itoa(len(*liarSet)))
+	for n1Index, n1 := range *liarSet {
 
 		//liars not attacking each other: n2 := nbLiars
 		for n2 := 0; n2 < N; n2++ {
 			if n1 != n2 {
 
-				lie := lies[n1+n2*N]
+				/*println("n1: " + strconv.Itoa(n1))
+				println("n2: " + strconv.Itoa(n2))
+				println("index: " + strconv.Itoa(n2+n1Index*N-1))*/
+
+				lie := (*lies)[n2+n1Index*N-1]
 				oldLatency := int(consistentChain.Blocks[n1].Latencies[numbersToNodes(n2)].Latency.Nanoseconds())
 
 				setLiarAndVictim(inconsistentChain, numbersToNodes(n1), numbersToNodes(n2), time.Duration(oldLatency+lie))
@@ -158,7 +163,7 @@ func createLyingNetwork(liarSet []int, graphDesign *GraphDesign, consistentChain
 	log.Print("Lies set")
 
 	//3) Create the blacklist of the chain
-	blacklist, _ := CreateBlacklist(inconsistentChain, 0, true, true, 0)
+	blacklist, _ := CreateBlacklist(inconsistentChain, 0, false, true, 0)
 
 	log.Print("Create blacklist")
 
@@ -170,7 +175,7 @@ func Get_M_subsets_of_K_liars_out_of_N_nodes(M int, K int, N int) [][]int {
 	superSet := makeRange(N)
 	current := make([]int, 0)
 	solution := make([][]int, 0)
-	solution = getSubsets(superSet, K, 0, current, solution)
+	solution = getSubsets(superSet, K, 0, current, solution, M)
 
 	return solution[:M]
 }

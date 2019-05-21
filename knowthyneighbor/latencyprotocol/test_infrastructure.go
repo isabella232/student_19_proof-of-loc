@@ -316,7 +316,11 @@ func makeRange(smallerThan int) []int {
 	return a
 }
 
-func getSubsets(superSet []int, k int, idx int, current []int, solution [][]int) [][]int {
+func getSubsets(superSet []int, k int, idx int, current []int, solution [][]int, nbNeeded int) [][]int {
+	if len(solution) >= nbNeeded {
+		return solution
+	}
+
 	if len(current) == k {
 		solution = append(solution, current)
 		return solution
@@ -326,9 +330,9 @@ func getSubsets(superSet []int, k int, idx int, current []int, solution [][]int)
 	}
 	x := superSet[idx]
 	current = append(current, x)
-	solution = getSubsets(superSet, k, idx+1, current, solution)
+	solution = getSubsets(superSet, k, idx+1, current, solution, nbNeeded)
 	current = current[:len(current)-1]
-	solution = getSubsets(superSet, k, idx+1, current, solution)
+	solution = getSubsets(superSet, k, idx+1, current, solution, nbNeeded)
 	return solution
 }
 
