@@ -31,8 +31,8 @@ type GraphDesign struct {
 
 func TestFixedLieRandomLiarGraphCreation(t *testing.T) {
 
-	lowerBoundLies := 500
-	upperBoundLies := 10000
+	lowerBoundLies := 1000
+	upperBoundLies := 100000
 
 	nbNodes := 100
 	nbLiars := 33
