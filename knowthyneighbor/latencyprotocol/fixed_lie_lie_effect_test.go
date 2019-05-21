@@ -29,7 +29,7 @@ type GraphDesign struct {
 	UpperBoundLies  int
 }
 
-func TestFixedLieRandomLiarGraphCreation(t *testing.T) {
+func TestFixedLieRandomLiarwithMappingGraphCreation(t *testing.T) {
 
 	lowerBoundLies := 1000
 	upperBoundLies := 100000
@@ -37,20 +37,20 @@ func TestFixedLieRandomLiarGraphCreation(t *testing.T) {
 	nbNodes := 100
 	nbLiars := 33
 
-	nbLiarCombinations := 100
+	nbLiarCombinations := 200
 
 	graphDesign := &GraphDesign{nbNodes, nbLiars, nbNodes, 500, 1000, lowerBoundLies, upperBoundLies}
 
 	liarSets := Get_M_subsets_of_K_liars_out_of_N_nodes(nbLiarCombinations, nbLiars, nbNodes)
 
-	err := CreateFixedLiePercentageGraphData("test_100_Nodes_33_liars_fixed_lies_count_liars_bl", true, liarSets, graphDesign)
+	err := CreateFixedLieToEffectMap("test_map_lies_to_effects", true, liarSets, graphDesign)
 	if err != nil {
 		log.Print(err)
 	}
 
 }
 
-func CreateFixedLiePercentageGraphData(filename string, randomLiars bool, liarSets [][]int, graphDesign *GraphDesign) error {
+func CreateFixedLieToEffectMap(filename string, randomLiars bool, liarSets [][]int, graphDesign *GraphDesign) error {
 
 	//4) Create a graph where each original latency is on the x-axis,
 	//each corresponding latency actually recorded in the chain is on the y-axis,
@@ -79,13 +79,13 @@ func CreateFixedLiePercentageGraphData(filename string, randomLiars bool, liarSe
 	}
 	defer file.Close()
 
-	fmt.Fprintln(file, "node,is_liar,is_blacklisted")
+	fmt.Fprintln(file, "node,is_liar,is_blacklisted,lie")
 
 	lies := GetLies(graphDesign.NbLiars, graphDesign.NbVictims, graphDesign.LowerBoundLies, graphDesign.UpperBoundLies)
 
 	for _, liarSet := range liarSets {
 
-		_, unthreshedBlacklist := createLyingNetwork(&liarSet, graphDesign, consistentChain, &lies)
+		_, unthreshedBlacklist, mapping := createLyingNetworkWithMapping(&liarSet, graphDesign, consistentChain, &lies)
 		thresh := UpperThreshold(N)
 		//threshold := strconv.Itoa(thresh)
 
@@ -97,10 +97,13 @@ func CreateFixedLiePercentageGraphData(filename string, randomLiars bool, liarSe
 
 		for i := 0; i < N; i++ {
 			nodei := numbersToNodes(i)
-			isLiar := containsNodeWithID(liarSet, i)
+			isLiar := ContainsNodeWithID(liarSet, i)
 			isBlacklisted := blacklist.ContainsAsString(nodei)
-
-			fmt.Fprintln(file, nodei+","+strconv.FormatBool(isLiar)+","+strconv.FormatBool(isBlacklisted))
+			lie := 0
+			if isLiar {
+				lie = mapping[i]
+			}
+			fmt.Fprintln(file, nodei+","+strconv.FormatBool(isLiar)+","+strconv.FormatBool(isBlacklisted)+","+strconv.Itoa(lie))
 
 		}
 
@@ -111,18 +114,10 @@ func CreateFixedLiePercentageGraphData(filename string, randomLiars bool, liarSe
 
 }
 
-func containsNodeWithID(s []int, e int) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
-func createLyingNetwork(liarSet *([]int), graphDesign *GraphDesign, consistentChain *Chain, lies *([]int)) (*Chain, *Blacklistset) {
+func createLyingNetworkWithMapping(liarSet *([]int), graphDesign *GraphDesign, consistentChain *Chain, lies *([]int)) (*Chain, *Blacklistset, map[int]int) {
 
 	N := graphDesign.NbNodes
+	nodeLieMap := make(map[int]int)
 
 	//2) Modify some of the latencies so they might no longer be consistent
 	inconsistentChain := consistentChain.Copy()
@@ -156,6 +151,7 @@ func createLyingNetwork(liarSet *([]int), graphDesign *GraphDesign, consistentCh
 				oldLatency := int(consistentChain.Blocks[n1].Latencies[numbersToNodes(n2)].Latency.Nanoseconds())
 
 				setLiarAndVictim(inconsistentChain, numbersToNodes(n1), numbersToNodes(n2), time.Duration(oldLatency+lie))
+				nodeLieMap[n1] = lie
 			}
 		}
 	}
@@ -167,7 +163,16 @@ func createLyingNetwork(liarSet *([]int), graphDesign *GraphDesign, consistentCh
 
 	log.Print("Create blacklist")
 
-	return inconsistentChain, &blacklist
+	return inconsistentChain, &blacklist, nodeLieMap
+}
+
+func ContainsNodeWithID(s []int, e int) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
 
 // Get_M_subsets_of_K_liars_out_of_N_nodes does exactly what the name says with numbers as nodes
