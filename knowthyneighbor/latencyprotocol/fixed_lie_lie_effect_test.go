@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -20,37 +21,37 @@ import (
 )
 
 type GraphDesign struct {
-	NbNodes         int
-	NbLiars         int
-	NbVictims       int
-	LowerBoundTruth int
-	UpperBoundTruth int
-	LowerBoundLies  int
-	UpperBoundLies  int
+	NbNodes            int
+	NbLiars            int
+	NbVictims          int
+	LowerBoundTruth    int
+	UpperBoundTruth    int
+	LowerBoundLies     int
+	UpperBoundLies     int
+	NbLiarCombinations int
 }
 
 func TestFixedLieRandomLiarwithMappingGraphCreation(t *testing.T) {
+	rand.Seed(time.Now().UTC().UnixNano())
 
 	lowerBoundLies := 1000
-	upperBoundLies := 100000
+	upperBoundLies := 50000
 
 	nbNodes := 100
 	nbLiars := 33
 
-	nbLiarCombinations := 200
+	nbLiarCombinations := 100
 
-	graphDesign := &GraphDesign{nbNodes, nbLiars, nbNodes, 500, 1000, lowerBoundLies, upperBoundLies}
+	graphDesign := &GraphDesign{nbNodes, nbLiars, nbNodes, 500, 1000, lowerBoundLies, upperBoundLies, nbLiarCombinations}
 
-	liarSets := Get_M_subsets_of_K_liars_out_of_N_nodes(nbLiarCombinations, nbLiars, nbNodes)
-
-	err := CreateFixedLieToEffectMap("test_map_lies_to_effects", true, liarSets, graphDesign)
+	err := CreateFixedLieToEffectMap("test_map_lies_to_effects_100", false, graphDesign)
 	if err != nil {
 		log.Print(err)
 	}
 
 }
 
-func CreateFixedLieToEffectMap(filename string, randomLiars bool, liarSets [][]int, graphDesign *GraphDesign) error {
+func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *GraphDesign) error {
 
 	//4) Create a graph where each original latency is on the x-axis,
 	//each corresponding latency actually recorded in the chain is on the y-axis,
@@ -63,6 +64,14 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, liarSets [][]i
 	//1) Create chain with No TIVs or liars
 	consistentChain, _ := consistentChain(N)
 	log.Print("Created Consistent Graph")
+
+	var liarSets [][]int
+
+	if randomLiars {
+		liarSets = Get_M_subsets_of_K_liars_out_of_N_nodes(graphDesign.NbLiarCombinations, graphDesign.NbLiars, graphDesign.NbNodes)
+	} else {
+		liarSets = pickClusteredLiars(consistentChain, graphDesign.NbLiars, graphDesign.NbLiarCombinations)
+	}
 
 	/*testBlacklist, _ := CreateBlacklist(consistentChain, 0, false, true, 0)
 
@@ -83,7 +92,9 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, liarSets [][]i
 
 	lies := GetLies(graphDesign.NbLiars, graphDesign.NbVictims, graphDesign.LowerBoundLies, graphDesign.UpperBoundLies)
 
-	for _, liarSet := range liarSets {
+	for index, liarSet := range liarSets {
+
+		log.Print(strconv.Itoa(index))
 
 		_, unthreshedBlacklist, mapping := createLyingNetworkWithMapping(&liarSet, graphDesign, consistentChain, &lies)
 		thresh := UpperThreshold(N)
@@ -137,17 +148,29 @@ func createLyingNetworkWithMapping(liarSet *([]int), graphDesign *GraphDesign, c
 
 	//println("Size lies: " + strconv.Itoa(len(*lies)))
 	//println("Size liar set: " + strconv.Itoa(len(*liarSet)))
-	for n1Index, n1 := range *liarSet {
+
+	takenLies := make(map[int]bool)
+	nbLies := len(*lies)
+
+	for i := 0; i < nbLies; i++ {
+		takenLies[i] = false
+	}
+
+	for _, n1 := range *liarSet {
 
 		//liars not attacking each other: n2 := nbLiars
 		for n2 := 0; n2 < N; n2++ {
 			if n1 != n2 {
 
-				/*println("n1: " + strconv.Itoa(n1))
-				println("n2: " + strconv.Itoa(n2))
-				println("index: " + strconv.Itoa(n2+n1Index*N-1))*/
+				lieIndex := rand.Intn(N)
 
-				lie := (*lies)[n2+n1Index*N-1]
+				for takenLies[lieIndex] == true {
+					lieIndex = (lieIndex + 1) % nbLies
+				}
+
+				takenLies[lieIndex] = true
+
+				lie := (*lies)[lieIndex]
 				oldLatency := int(consistentChain.Blocks[n1].Latencies[numbersToNodes(n2)].Latency.Nanoseconds())
 
 				setLiarAndVictim(inconsistentChain, numbersToNodes(n1), numbersToNodes(n2), time.Duration(oldLatency+lie))
@@ -195,4 +218,44 @@ func GetLies(nbLiars int, nbVictims int, lowerBound int, upperBound int) []int {
 		}
 	}
 	return lies
+}
+
+func pickClusteredLiars(chain *Chain, nbLiars int, nbClusters int) [][]int {
+
+	clusters := make([][]int, nbClusters)
+	usedNodes := make(map[int]bool)
+
+	for h := 0; h < len(chain.Blocks); h++ {
+		usedNodes[h] = false
+	}
+
+	for i := 0; i < nbClusters; i++ {
+		//pick node from chain and get its closest neighbors (sort latencies) (without already used ones)
+		if usedNodes[i] == false {
+			latencyMap := chain.Blocks[i].Latencies
+			sorting := make(map[int]int)
+			lats := make([]int, 0)
+			for node, lat := range latencyMap {
+				intLat := int(lat.Latency)
+				sorting[intLat] = nodesToNumbers(node)
+				lats = append(lats, intLat)
+			}
+
+			sort.Ints(lats)
+
+			nodes := make([]int, 0)
+
+			for _, lat := range lats {
+				nodes = append(nodes, sorting[lat])
+			}
+
+			clusters[i] = nodes
+			usedNodes[i] = true
+
+		}
+
+	}
+
+	return clusters
+
 }
