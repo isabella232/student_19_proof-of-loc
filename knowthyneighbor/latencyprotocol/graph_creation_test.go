@@ -13,18 +13,18 @@ import (
 	"go.dedis.ch/onet/v3/log"
 )
 
-func TestGraphCreation(t *testing.T) {
+func TestFixedLiarGraphCreation(t *testing.T) {
 
-	err := CreatePercentageGraphData(100, 33, "test_100_nodes_attack_all_90000")
+	err := CreateFixedLiarPercentageGraphData(100, 33, "test_100_nodes_attack_all_90000")
 	if err != nil {
 		log.Print(err)
 	}
 
 }
 
-func CreateLinearGraphData(N int, nbLiars int, filename string) error {
+func CreateFixedLiarLinearGraphData(N int, nbLiars int, filename string) error {
 
-	consistentChain, inconsistentChain, blacklist, err := createHonestAndLyingNetworks(N, nbLiars)
+	consistentChain, inconsistentChain, blacklist, err := createFixedLiarHonestAndLyingNetworks(N, nbLiars)
 
 	if err != nil {
 		return err
@@ -36,7 +36,7 @@ func CreateLinearGraphData(N int, nbLiars int, filename string) error {
 	// 0, 1 or 2 nodes recorded as blacklisted
 	//=> configure X, Y, Blacklist values for graphing, write to file
 
-	file, err := os.Create("../../python_graphs/data/linear/" + filename + ".csv")
+	file, err := os.Create("../../python_graphs/fixed_liars/data/linear/" + filename + ".csv")
 	if err != nil {
 		log.Fatal("Cannot create file", err)
 	}
@@ -69,7 +69,7 @@ func CreateLinearGraphData(N int, nbLiars int, filename string) error {
 
 }
 
-func CreatePercentageGraphData(N int, nbLiars int, filename string) error {
+func CreateFixedLiarPercentageGraphData(N int, nbLiars int, filename string) error {
 
 	//4) Create a graph where each original latency is on the x-axis,
 	//each corresponding latency actually recorded in the chain is on the y-axis,
@@ -77,7 +77,7 @@ func CreatePercentageGraphData(N int, nbLiars int, filename string) error {
 	// 0, 1 or 2 nodes recorded as blacklisted
 	//=> configure X, Y, Blacklist values for graphing, write to file
 
-	consistentChain, inconsistentChain, blacklist, err := createHonestAndLyingNetworks(N, nbLiars)
+	consistentChain, inconsistentChain, blacklist, err := createFixedLiarHonestAndLyingNetworks(N, nbLiars)
 	thresh := UpperThreshold(N)
 	threshold := strconv.Itoa(thresh)
 
@@ -115,7 +115,7 @@ func CreatePercentageGraphData(N int, nbLiars int, filename string) error {
 
 }
 
-func createHonestAndLyingNetworks(N int, nbLiars int) (*Chain, *Chain, *Blacklistset, error) {
+func createFixedLiarHonestAndLyingNetworks(N int, nbLiars int) (*Chain, *Chain, *Blacklistset, error) {
 
 	//1) Create chain with No TIVs or liars
 	consistentChain, _ := consistentChain(N)
