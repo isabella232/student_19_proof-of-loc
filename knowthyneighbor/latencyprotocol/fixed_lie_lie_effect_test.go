@@ -44,7 +44,7 @@ func TestFixedLieRandomLiarwithMappingGraphCreation(t *testing.T) {
 
 	graphDesign := &GraphDesign{nbNodes, nbLiars, nbNodes, 500, 1000, lowerBoundLies, upperBoundLies, nbLiarCombinations}
 
-	err := CreateFixedLieToEffectMap("test_map_lies_to_effects_100", false, graphDesign)
+	err := CreateFixedLieToEffectMap("test_map_lies_to_effects_100_clustered", false, graphDesign)
 	if err != nil {
 		log.Print(err)
 	}
@@ -70,6 +70,7 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 	if randomLiars {
 		liarSets = Get_M_subsets_of_K_liars_out_of_N_nodes(graphDesign.NbLiarCombinations, graphDesign.NbLiars, graphDesign.NbNodes)
 	} else {
+		log.Print("Picking clustered liars")
 		liarSets = pickClusteredLiars(consistentChain, graphDesign.NbLiars, graphDesign.NbLiarCombinations)
 	}
 
@@ -88,8 +89,9 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 	}
 	defer file.Close()
 
-	fmt.Fprintln(file, "node,is_liar,is_blacklisted,lie")
+	fmt.Fprintln(file, "node,is_liar,is_blacklisted,lie,cluster")
 
+	log.Print("Getting lies")
 	lies := GetLies(graphDesign.NbLiars, graphDesign.NbVictims, graphDesign.LowerBoundLies, graphDesign.UpperBoundLies)
 
 	for index, liarSet := range liarSets {
@@ -114,7 +116,7 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 			if isLiar {
 				lie = mapping[i]
 			}
-			fmt.Fprintln(file, nodei+","+strconv.FormatBool(isLiar)+","+strconv.FormatBool(isBlacklisted)+","+strconv.Itoa(lie))
+			fmt.Fprintln(file, nodei+","+strconv.FormatBool(isLiar)+","+strconv.FormatBool(isBlacklisted)+","+strconv.Itoa(lie)+","+strconv.Itoa(index))
 
 		}
 
@@ -157,10 +159,12 @@ func createLyingNetworkWithMapping(liarSet *([]int), graphDesign *GraphDesign, c
 	}
 
 	for _, n1 := range *liarSet {
+		log.Print("n1: " + strconv.Itoa(n1))
 
-		//liars not attacking each other: n2 := nbLiars
 		for n2 := 0; n2 < N; n2++ {
 			if n1 != n2 {
+
+				log.Print("n2: " + strconv.Itoa(n2))
 
 				lieIndex := rand.Intn(N)
 
