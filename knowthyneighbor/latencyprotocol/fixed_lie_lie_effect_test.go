@@ -9,6 +9,7 @@ Two sets of experiments: one where liar sets are random, one where liers within 
 */
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -74,15 +75,6 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 		liarSets = pickClusteredLiars(consistentChain, graphDesign.NbLiars, graphDesign.NbLiarCombinations)
 	}
 
-	/*testBlacklist, _ := CreateBlacklist(consistentChain, 0, false, true, 0)
-
-	log.Print("Created Blacklist for consistent")
-
-	if !testBlacklist.IsEmpty() {
-		log.Print(testBlacklist.ToString())
-		return errors.New("Original graph has triangle inequality violations")
-	}*/
-
 	file, err := os.Create("../../python_graphs/data/fixed_lies/" + filename + ".csv")
 	if err != nil {
 		log.Fatal("Cannot create file", err)
@@ -94,11 +86,15 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 	log.Print("Getting lies")
 	lies := GetLies(graphDesign.NbLiars, graphDesign.NbVictims, graphDesign.LowerBoundLies, graphDesign.UpperBoundLies)
 
+	log.Print("got lies")
 	for index, liarSet := range liarSets {
 
 		log.Print(strconv.Itoa(index))
 
-		_, unthreshedBlacklist, mapping := createLyingNetworkWithMapping(&liarSet, graphDesign, consistentChain, &lies)
+		_, unthreshedBlacklist, mapping, err := createLyingNetworkWithMapping(&liarSet, graphDesign, consistentChain, &lies)
+		if err != nil {
+			return err
+		}
 		thresh := UpperThreshold(N)
 		//threshold := strconv.Itoa(thresh)
 
@@ -110,13 +106,15 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 
 		for i := 0; i < N; i++ {
 			nodei := numbersToNodes(i)
-			isLiar := ContainsNodeWithID(liarSet, i)
+			isLiar := ContainsInt(liarSet, i)
 			isBlacklisted := blacklist.ContainsAsString(nodei)
-			lie := 0
 			if isLiar {
-				lie = mapping[i]
+				for _, lie := range mapping[i] {
+					fmt.Fprintln(file, nodei+","+strconv.FormatBool(isLiar)+","+strconv.FormatBool(isBlacklisted)+","+strconv.Itoa(lie)+","+strconv.Itoa(index))
+				}
+			} else {
+				fmt.Fprintln(file, nodei+","+strconv.FormatBool(isLiar)+","+strconv.FormatBool(isBlacklisted)+","+strconv.Itoa(0)+","+strconv.Itoa(index))
 			}
-			fmt.Fprintln(file, nodei+","+strconv.FormatBool(isLiar)+","+strconv.FormatBool(isBlacklisted)+","+strconv.Itoa(lie)+","+strconv.Itoa(index))
 
 		}
 
@@ -127,49 +125,50 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 
 }
 
-func createLyingNetworkWithMapping(liarSet *([]int), graphDesign *GraphDesign, consistentChain *Chain, lies *([]int)) (*Chain, *Blacklistset, map[int]int) {
+func createLyingNetworkWithMapping(
+	liarSet *([]int), graphDesign *GraphDesign, consistentChain *Chain, lies *([]int)) (*Chain, *Blacklistset, map[int][]int, error) {
 
 	N := graphDesign.NbNodes
-	nodeLieMap := make(map[int]int)
+	nodeLieMap := make(map[int][]int)
 
 	//2) Modify some of the latencies so they might no longer be consistent
 	inconsistentChain := consistentChain.Copy()
 	log.Print("Copied Consistent Graph")
 
-	//All liars target 1 victim
-	/*victim := nbLiars
-	for n1 := range liarSet {
-
-		oldLatency := int(consistentChain.Blocks[n1].Latencies[numbersToNodes(victim)].Latency.Nanoseconds())
-
-		lie := lies[n1+victim*N]
-
-		setLiarAndVictim(inconsistentChain, numbersToNodes(n1), numbersToNodes(victim), time.Duration(lie + oldLatency))
-
-	}*/
-
-	//println("Size lies: " + strconv.Itoa(len(*lies)))
-	//println("Size liar set: " + strconv.Itoa(len(*liarSet)))
-
 	takenLies := make(map[int]bool)
 	nbLies := len(*lies)
 
+	log.Print("nbLies: " + strconv.Itoa(nbLies))
 	for i := 0; i < nbLies; i++ {
 		takenLies[i] = false
 	}
 
+	log.Print("size liar set: " + strconv.Itoa(len(*liarSet)))
+
+	sort.Ints(*liarSet)
+
+	liesSet := 0
+
 	for _, n1 := range *liarSet {
-		log.Print("n1: " + strconv.Itoa(n1))
+		nodeLieMap[n1] = make([]int, 0)
 
 		for n2 := 0; n2 < N; n2++ {
-			if n1 != n2 {
 
-				log.Print("n2: " + strconv.Itoa(n2))
+			if n1 != n2 && !(ContainsInt(*liarSet, n2) && n2 <= n1) {
 
 				lieIndex := rand.Intn(N)
 
+				initLie := lieIndex
+
 				for takenLies[lieIndex] == true {
 					lieIndex = (lieIndex + 1) % nbLies
+
+					if lieIndex == initLie {
+						log.Print("no more lies left")
+						log.Print(nbLies)
+						log.Print(liesSet)
+						return nil, nil, nil, errors.New("Not enough lies")
+					}
 				}
 
 				takenLies[lieIndex] = true
@@ -178,7 +177,17 @@ func createLyingNetworkWithMapping(liarSet *([]int), graphDesign *GraphDesign, c
 				oldLatency := int(consistentChain.Blocks[n1].Latencies[numbersToNodes(n2)].Latency.Nanoseconds())
 
 				setLiarAndVictim(inconsistentChain, numbersToNodes(n1), numbersToNodes(n2), time.Duration(oldLatency+lie))
-				nodeLieMap[n1] = lie
+				nodeLieMap[n1] = append(nodeLieMap[n1], lie)
+				if ContainsInt(*liarSet, n2) {
+					if nodeLieMap[n2] != nil {
+						nodeLieMap[n2] = append(nodeLieMap[n2], lie)
+					} else {
+						nodeLieMap[n2] = make([]int, 0)
+						nodeLieMap[n2] = append(nodeLieMap[n2], lie)
+					}
+
+				}
+				liesSet++
 			}
 		}
 	}
@@ -190,10 +199,10 @@ func createLyingNetworkWithMapping(liarSet *([]int), graphDesign *GraphDesign, c
 
 	log.Print("Create blacklist")
 
-	return inconsistentChain, &blacklist, nodeLieMap
+	return inconsistentChain, &blacklist, nodeLieMap, nil
 }
 
-func ContainsNodeWithID(s []int, e int) bool {
+func ContainsInt(s []int, e int) bool {
 	for _, a := range s {
 		if a == e {
 			return true
@@ -214,11 +223,11 @@ func Get_M_subsets_of_K_liars_out_of_N_nodes(M int, K int, N int) [][]int {
 
 //GetLies generates a pseudo-random set of lies to be reused during fixed lie testing
 func GetLies(nbLiars int, nbVictims int, lowerBound int, upperBound int) []int {
-	lies := make([]int, nbLiars*nbVictims)
+	lies := make([]int, 0)
 	for i := 0; i < nbLiars; i++ {
-		for j := 0; j < nbVictims; j++ {
+		for j := 0; j < (nbVictims - i); j++ {
 			lat := rand.Intn(upperBound-lowerBound) + lowerBound
-			lies[j+i*nbVictims] = lat
+			lies = append(lies, lat)
 		}
 	}
 	return lies
@@ -245,11 +254,13 @@ func pickClusteredLiars(chain *Chain, nbLiars int, nbClusters int) [][]int {
 				lats = append(lats, intLat)
 			}
 
-			sort.Ints(lats)
+			uniqueLats := unique(lats)
+
+			sort.Ints(uniqueLats)
 
 			nodes := make([]int, 0)
 
-			for _, lat := range lats {
+			for _, lat := range uniqueLats[:nbLiars] {
 				nodes = append(nodes, sorting[lat])
 			}
 
@@ -262,4 +273,16 @@ func pickClusteredLiars(chain *Chain, nbLiars int, nbClusters int) [][]int {
 
 	return clusters
 
+}
+
+func unique(intSlice []int) []int {
+	keys := make(map[int]bool)
+	list := []int{}
+	for _, entry := range intSlice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
 }
