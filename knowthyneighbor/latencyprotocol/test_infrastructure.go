@@ -171,9 +171,11 @@ func simpleChain(nbNodes int) (*Chain, []sigAlg.PublicKey) {
 	return chain, nodes
 }
 
-func consistentChain(nbNodes int) (*Chain, []sigAlg.PublicKey) {
+//func consistentChain(nbNodes int) (*Chain, []sigAlg.PublicKey) {
+func consistentChain(nbNodes int, startIndex int) (*Chain, []string) {
+
 	blocks := make([]*Block, nbNodes)
-	nodes := make([]sigAlg.PublicKey, nbNodes)
+	nodes := make([]string, nbNodes)
 
 	for i := 0; i < nbNodes; i++ {
 		latencies := make(map[string]ConfirmedLatency)
@@ -181,21 +183,22 @@ func consistentChain(nbNodes int) (*Chain, []sigAlg.PublicKey) {
 		for j := 0; j < nbNodes; j++ {
 			if j != i {
 				lat := rand.Intn(500) + 500
-				latencies[numbersToNodes(j)] = ConfirmedLatency{time.Duration(lat), nil, time.Now(), nil}
+				latencies[numbersToNodes(j+startIndex)] = ConfirmedLatency{time.Duration(lat), nil, time.Now(), nil}
 			}
 		}
 
 		block := &Block{
 			ID: &NodeID{
 				ServerID:  nil,
-				PublicKey: sigAlg.PublicKey(numbersToNodes(i)),
+				PublicKey: sigAlg.PublicKey(numbersToNodes(i + startIndex)),
 			},
 			Latencies: latencies,
 		}
 
 		blocks[i] = block
 
-		nodes[i] = sigAlg.PublicKey([]byte(numbersToNodes(i)))
+		//nodes[i] = sigAlg.PublicKey([]byte(numbersToNodes(i)))
+		nodes[i] = numbersToNodes(i + startIndex)
 
 	}
 

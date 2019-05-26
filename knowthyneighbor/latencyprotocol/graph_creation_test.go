@@ -118,7 +118,7 @@ func CreateFixedLiarPercentageGraphData(N int, nbLiars int, filename string) err
 func createFixedLiarHonestAndLyingNetworks(N int, nbLiars int) (*Chain, *Chain, *Blacklistset, error) {
 
 	//1) Create chain with No TIVs or liars
-	consistentChain, _ := consistentChain(N)
+	consistentChain, _ := consistentChain(N, 0)
 	log.Print("Created Consistent Graph")
 
 	testBlacklist, _ := CreateBlacklist(consistentChain, 0, false, true, 0)

@@ -49,7 +49,7 @@ func CreateFixedLieIncreasingLiesData(filename string, randomLiars bool, graphDe
 	N := graphDesign.NbNodes
 
 	//1) Create chain with No TIVs or liars
-	consistentChain, _ := consistentChain(N)
+	consistentChain, _ := consistentChain(N, 0)
 	log.Print("Created Consistent Graph")
 
 	var liarSets [][]int
