@@ -1,12 +1,17 @@
+/*
+protocol_test tests the functions of the protocol file, which allow us to manipulate chains of latencies
+*/
+
 package latencyprotocol
 
 import (
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v3/pairing"
 	"go.dedis.ch/onet/v3"
 	"go.dedis.ch/onet/v3/log"
-	"testing"
-	"time"
 )
 
 var tSuite = pairing.NewSuiteBn256()

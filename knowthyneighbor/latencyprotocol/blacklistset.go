@@ -1,3 +1,9 @@
+/*
+
+Blacklistset is a set of public keys corresponding to blacklisted nodes, with the number of Strikes against them
+
+*/
+
 package latencyprotocol
 
 import (

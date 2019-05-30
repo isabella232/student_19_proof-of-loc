@@ -1,3 +1,10 @@
+/*
+distance stores functions to estimate the distance between two nodes based on the information
+stored in a chain, and estimate the correctness of these measures by creating a balcklist of
+dishonest nodes
+
+*/
+
 package latencyprotocol
 
 import (
@@ -233,11 +240,14 @@ type triangle struct {
 	C string
 }
 
-//CreateBlacklist iterates through a chain and for each block checks if the latencies qiven by its node make sense
-// If they do not, the node is added to a blacklist of nodes not to be trusted
-//Warning: for now, the following assumptions are made:
-//* all nodes give latencies to all other nodes (except themselves)
-//* all latencies are symmetric (A -> B == B -> A)
+/*
+CreateBlacklist iterates through a chain and for each block checks if the latencies qiven by its node make sense
+If they do not, the node is added to a blacklist of nodes not to be trusted
+
+Warning: for now, the following assumptions are made:
+	*all nodes give latencies to all other nodes (except themselves)
+	*all latencies are symmetric (A -> B == B -> A)
+*/
 func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool, threshGiven bool, threshold int) (Blacklistset, error) {
 
 	N := len(chain.Blocks)

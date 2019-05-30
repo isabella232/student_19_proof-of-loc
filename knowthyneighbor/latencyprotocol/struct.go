@@ -1,3 +1,7 @@
+/*
+struct contains necessary structures to execute the latency measurement protocol
+*/
+
 package latencyprotocol
 
 import (

@@ -1,15 +1,22 @@
+/*
+messaging contains the functions allowing the five-way latency measure protocol to securely
+estimate the latency between two nodes with upd messages
+
+*/
+
 package latencyprotocol
 
 import (
 	"errors"
-	"github.com/dedis/student_19_proof-of-loc/knowthyneighbor/udp"
-	"go.dedis.ch/onet/v3/log"
-	"go.dedis.ch/protobuf"
-	sigAlg "golang.org/x/crypto/ed25519"
 	"math"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/dedis/student_19_proof-of-loc/knowthyneighbor/udp"
+	"go.dedis.ch/onet/v3/log"
+	"go.dedis.ch/protobuf"
+	sigAlg "golang.org/x/crypto/ed25519"
 )
 
 const freshnessDelta = 10 * time.Second

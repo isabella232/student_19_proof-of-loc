@@ -1,10 +1,15 @@
+/*
+distance_test tests the functions implemented in the distance file to estimate the distance between two nodes
+based on the measurements available in their chain
+*/
 package latencyprotocol
 
 import (
-	"github.com/stretchr/testify/require"
-	"go.dedis.ch/onet/v3/log"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"go.dedis.ch/onet/v3/log"
 )
 
 func TestApproximateDistanceAllInformation(t *testing.T) {
