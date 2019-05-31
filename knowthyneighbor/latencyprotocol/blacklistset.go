@@ -83,15 +83,6 @@ func (set *Blacklistset) NumberStrikes(key sigAlg.PublicKey) int {
 	return set.Strikes[string(key)]
 }
 
-//UpperThreshold returns the maximum number of strikes a victim node can get
-func UpperThreshold(N int) int {
-	third := float64(N) / 3
-	return int(int(third)*int(N-1)) * 6
-	//Multiply by 6 because that's how often a triangle will be tested
-	//return (N / 3) * (N - (N / 3) - 1)
-
-}
-
 //GetBlacklistWithThreshold returns a new blacklist containing only the nodes with more than a given threshold of Strikes
 func (set *Blacklistset) GetBlacklistWithThreshold(thresh int) Blacklistset {
 	threshBlacklist := NewBlacklistset()

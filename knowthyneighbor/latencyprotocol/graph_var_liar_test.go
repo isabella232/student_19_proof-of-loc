@@ -45,7 +45,7 @@ func TestFixedLieRandomLiarwithMappingGraphCreation(t *testing.T) {
 
 	graphDesign := &GraphDesign{nbNodes, nbLiars, nbNodes, 500, 1000, lowerBoundLies, upperBoundLies, nbLiarCombinations}
 
-	err := CreateFixedLieToEffectMap("test_map_lies_to_effects_100_clustered", false, graphDesign)
+	err := CreateFixedLieToEffectMap("test_map_lies_to_effects_100_clustered_with_suspects", false, graphDesign)
 	if err != nil {
 		log.Print(err)
 	}
@@ -99,6 +99,11 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 		//threshold := strconv.Itoa(thresh)
 
 		blacklist := unthreshedBlacklist.GetBlacklistWithThreshold(thresh)
+
+		/*suspects := BlacklistEnhancement(inconsistentChain, N)
+		for _, suspect := range suspects {
+			blacklist.AddWithStrikesStringKey(suspect, 0)
+		}*/
 
 		if err != nil {
 			return err

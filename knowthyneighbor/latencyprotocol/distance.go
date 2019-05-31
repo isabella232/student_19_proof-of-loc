@@ -9,7 +9,6 @@ package latencyprotocol
 
 import (
 	"errors"
-	"log"
 
 	"strconv"
 	"time"
@@ -238,93 +237,6 @@ type triangle struct {
 	A string
 	B string
 	C string
-}
-
-/*
-CreateBlacklist iterates through a chain and for each block checks if the latencies qiven by its node make sense
-If they do not, the node is added to a blacklist of nodes not to be trusted
-
-Warning: for now, the following assumptions are made:
-	*all nodes give latencies to all other nodes (except themselves)
-	*all latencies are symmetric (A -> B == B -> A)
-*/
-func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool, threshGiven bool, threshold int) (Blacklistset, error) {
-
-	N := len(chain.Blocks)
-
-	if !threshGiven {
-		threshold = UpperThreshold(N)
-	}
-
-	if verbose {
-		log.Print("Threshold: " + strconv.Itoa(threshold))
-	}
-	blockMapper := make(map[string]*Block)
-
-	blacklist := NewBlacklistset()
-
-	for _, block := range chain.Blocks {
-		blockMapper[string(block.ID.PublicKey)] = block
-	}
-
-	//for each node B
-	//for each node C
-	//for each node D
-	/* Check B -> C, B -> D, C -> D
-	* if triangle of lengths does not result in realistic angles (rule of 3 for triangles),
-	B, C or D needs to be blacklisted -> add (B,C, D) to a "suspicious" list and keep checking B
-	*/
-
-	for _, BBlock := range chain.Blocks {
-
-		Bstring := string(BBlock.ID.PublicKey)
-
-		for Cstring := range BBlock.Latencies {
-			if Cstring != Bstring {
-				CBlock, CHere := blockMapper[Cstring]
-
-				if CHere {
-
-					for Dstring := range BBlock.Latencies {
-						if Dstring != Cstring && Dstring != Bstring {
-							DBlock, DHere := blockMapper[Dstring]
-
-							if DHere {
-
-								BtoD, BtoDHere := BBlock.getLatency(DBlock)
-								BtoC, BtoCHere := BBlock.getLatency(CBlock)
-								CtoD, CtoDHere := CBlock.getLatency(DBlock)
-
-								if BtoDHere && BtoCHere && CtoDHere && !TriangleInequalitySatisfiedInt(int(BtoD), int(BtoC), int(CtoD)) {
-
-									blacklist.Add(sigAlg.PublicKey([]byte(Bstring)))
-									blacklist.Add(sigAlg.PublicKey([]byte(Cstring)))
-									blacklist.Add(sigAlg.PublicKey([]byte(Dstring)))
-								}
-
-							}
-						}
-
-					}
-				}
-			}
-		}
-	}
-
-	if verbose {
-		log.Print("Before Thresholding: ")
-		log.Print(blacklist.ToStringFake())
-	}
-
-	threshBlacklist := blacklist.GetBlacklistWithThreshold(threshold)
-
-	if verbose {
-		log.Print("After Thresholding: ")
-		log.Print(threshBlacklist.ToStringFake())
-	}
-
-	return threshBlacklist, nil
-
 }
 
 //TriangleInequalitySatisfied returns whether the triangle inequality theorem is satisfied
