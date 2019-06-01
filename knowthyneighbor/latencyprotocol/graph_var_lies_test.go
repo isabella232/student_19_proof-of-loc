@@ -29,13 +29,13 @@ import (
 func TestVarLiesGraphCreation(t *testing.T) {
 
 	//configs =====================================================================================================
-	linear := false      //collect data as sum or as percentage
-	withSuspects := true //use enhanced blacklisting algorithm
-	singleVictim := true //liars target single victim
-	coordinated := true  //liars coordinate (their lies do not contradict each other)
+	linear := false       //collect data as sum or as percentage
+	withSuspects := true  //use enhanced blacklisting algorithm
+	singleVictim := false //liars target single victim
+	coordinated := false  //liars coordinate (their lies do not contradict each other)
 	nbNodes := 100
 	nbLiars := 33
-	maxLatency := 7000 //the maximum amount by which a lie deviates from the corresponding latency's true value
+	maxLatency := 20000 //the maximum amount by which a lie deviates from the corresponding latency's true value
 
 	verbose := true //print information about test to terminal
 
