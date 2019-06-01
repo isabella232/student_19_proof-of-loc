@@ -29,7 +29,7 @@ import (
 func TestVarLiesGraphCreation(t *testing.T) {
 
 	//configs =====================================================================================================
-	linear := true       //collect data as sum or as percentage
+	linear := false      //collect data as sum or as percentage
 	withSuspects := true //use enhanced blacklisting algorithm
 	singleVictim := true //liars target single victim
 	coordinated := true  //liars coordinate (their lies do not contradict each other)
@@ -153,7 +153,7 @@ func CreateFixedLiarPercentageGraphData(N int, nbLiars int, filename string,
 	}
 	defer file.Close()
 
-	fmt.Fprintln(file, "node_1,node_2,lie_percentage,nb_strikes_1,nb_strikes_2,threshold")
+	fmt.Fprintln(file, "node_1,node_2,lie_percentage,nb_strikes_1,nb_strikes_2,threshold,blacklisted_1,blacklisted_2")
 
 	for i := 0; i < N; i++ {
 		nodei := numbersToNodes(i)
@@ -166,7 +166,9 @@ func CreateFixedLiarPercentageGraphData(N int, nbLiars int, filename string,
 				percentage := strconv.FormatFloat(math.Abs(float64(recorded-real))/float64(real), 'f', 2, 64)
 				nbStrikes1 := strconv.Itoa(blacklist.NbStrikesOf(nodei))
 				nbStrikes2 := strconv.Itoa(blacklist.NbStrikesOf(nodej))
-				fmt.Fprintln(file, nodei+","+nodej+","+percentage+","+nbStrikes1+","+nbStrikes2+","+threshold)
+				blacklisted1 := strconv.FormatBool(blacklist.ContainsAsString(nodei))
+				blacklisted2 := strconv.FormatBool(blacklist.ContainsAsString(nodej))
+				fmt.Fprintln(file, nodei+","+nodej+","+percentage+","+nbStrikes1+","+nbStrikes2+","+threshold+","+blacklisted1+","+blacklisted2)
 			}
 
 		}
