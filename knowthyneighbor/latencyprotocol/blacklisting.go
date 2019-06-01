@@ -17,7 +17,7 @@ Warning: for now, the following assumptions are made:
 	*all nodes give latencies to all other nodes (except themselves)
 	*all latencies are symmetric (A -> B == B -> A)
 */
-func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool, threshGiven bool, threshold int) (Blacklistset, error) {
+func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool, threshGiven bool, threshold int, withSuspect bool) (Blacklistset, error) {
 
 	N := len(chain.Blocks)
 
@@ -87,6 +87,15 @@ func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool, threshGive
 
 	threshBlacklist := blacklist.GetBlacklistWithThreshold(threshold)
 
+	if withSuspect == true {
+		suspects := BlacklistEnhancement(chain, N)
+		for _, suspect := range suspects {
+			if !threshBlacklist.ContainsAsString(suspect) {
+				threshBlacklist.AddWithStrikesStringKey(suspect, 1)
+			}
+		}
+	}
+
 	if verbose {
 		log.Print("After Thresholding: ")
 		log.Print(threshBlacklist.ToStringFake())
@@ -107,7 +116,7 @@ func UpperThreshold(N int) int {
 
 //BlacklistEnhancement enhanced the basic blacklisting triangle inequality algorithm by checking strike patterns
 func BlacklistEnhancement(chain *Chain, N int) []string {
-	unthresholded, err := CreateBlacklist(chain, 0, false, true, 0)
+	unthresholded, err := CreateBlacklist(chain, 0, false, true, 0, false)
 	if err != nil {
 		log.Print(err)
 	}
@@ -206,7 +215,8 @@ func SuspectIsLiar(chain *Chain, suspect string, N int) bool {
 		}
 	}
 	nbNonAccusersNeeded := int(2 * (N / 3))
+	//nbNonAccusersNeeded := int((N / 3)) + 1 //try this
 
-	//if we cannot find the necessary number of non-accusers, the node is a liar
+	//if we cannot find 2N/3 nodes willing to not accuse for the suspect, the suspect is a liar
 	return nbNonAccusers < nbNonAccusersNeeded
 }

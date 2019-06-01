@@ -30,44 +30,51 @@ func Test_simulate_multicluster_infiltration(t *testing.T) {
 
 	distance := 100000
 
-	nbClusters := 5
+	nbClusters := 2
 
-	file, err := os.Create("../../python_graphs/data/clusters/size_imbalance_" + strconv.Itoa(nbClusters) + ".csv")
+	withSuspects := true
+
+	file, err := os.Create("../../python_graphs/data/clusters/low_thresh_size_imbalance_" + strconv.Itoa(nbClusters) + "_with_suspects.csv")
 	if err != nil {
 		log.Fatal("Cannot create file", err)
 	}
 	defer file.Close()
 
-	fmt.Fprintln(file, "N,c1,c2,c3,liar_caught")
+	columns := "N,"
+
+	for i := 1; i <= nbClusters; i++ {
+		columns += "c" + strconv.Itoa(i) + ","
+	}
+	columns += "liar_caught"
+	fmt.Fprintln(file, columns)
 
 	for N := 11; N < 26; N++ {
 		log.Print(N)
 		clusterSizes := SubsetLengthKSummingToS(nbClusters, N)
 		for _, clusterSizeOrig := range clusterSizes {
-			clusterSizeRotated := rotatedArrays(clusterSizeOrig)
+			clusterSizeRotated := RotatedArrays(clusterSizeOrig)
 			for _, clusterSize := range clusterSizeRotated {
-				consistentChain, _, _ := create_graph_with_C_clusters(len(clusterSize), clusterSize, distance)
+				consistentChain, _, _ := Create_graph_with_C_clusters(len(clusterSize), clusterSize, distance)
 				//test
-				inconsistentChain := set_lies_to_clusters(0, consistentChain)
+
+				inconsistentChain := Set_lies_to_clusters(0, consistentChain)
 
 				thresh := UpperThreshold(N)
 				//threshold := strconv.Itoa(thresh)
-				blacklist, err := CreateBlacklist(inconsistentChain, 0, false, true, thresh)
+				blacklist, err := CreateBlacklist(inconsistentChain, 0, false, true, thresh, withSuspects)
 				//unthresholded, err := CreateBlacklist(inconsistentChain, 0, false, true, 0)
 				if err != nil {
 					log.Print(err)
 				}
 
-				fmt.Fprintln(
-					file, strconv.Itoa(N)+
-						","+
-						strconv.Itoa(clusterSize[0])+
-						","+
-						strconv.Itoa(clusterSize[1])+
-						","+
-						strconv.Itoa(clusterSize[2])+
-						","+
-						strconv.FormatBool(!blacklist.IsEmpty()))
+				line := strconv.Itoa(N) + ","
+
+				for i := 0; i < nbClusters; i++ {
+					line += strconv.Itoa(clusterSize[i]) + ","
+				}
+				line += strconv.FormatBool(!blacklist.IsEmpty())
+
+				fmt.Fprintln(file, line)
 			}
 		}
 
@@ -75,7 +82,7 @@ func Test_simulate_multicluster_infiltration(t *testing.T) {
 
 }
 
-func rotatedArrays(array []int) [][]int {
+func RotatedArrays(array []int) [][]int {
 	nbElems := len(array)
 	arrays := make([][]int, nbElems)
 	arrays[0] = array
@@ -91,7 +98,7 @@ func rotatedArrays(array []int) [][]int {
 	return arrays
 }
 
-func create_graph_with_C_clusters(C int, clusterSizes []int, distance int) (*Chain, []*Chain, [][]string) {
+func Create_graph_with_C_clusters(C int, clusterSizes []int, distance int) (*Chain, []*Chain, [][]string) {
 
 	clusters := make([]*Chain, C)
 	nodeLists := make([][]string, C)
@@ -150,7 +157,7 @@ func create_graph_with_C_clusters(C int, clusterSizes []int, distance int) (*Cha
 
 }
 
-func set_lies_to_clusters(liarID int, consistentChain *Chain) *Chain {
+func Set_lies_to_clusters(liarID int, consistentChain *Chain) *Chain {
 
 	inconsistentChain := consistentChain.Copy()
 
@@ -170,7 +177,7 @@ func set_lies_to_clusters(liarID int, consistentChain *Chain) *Chain {
 	return inconsistentChain
 }
 
-func binarySearch(initDistance int, N int, clusterSizes []int) int {
+func BinarySearch(initDistance int, N int, clusterSizes []int, withSuspects bool) int {
 
 	low := 0
 	high := initDistance
@@ -181,14 +188,14 @@ func binarySearch(initDistance int, N int, clusterSizes []int) int {
 		median = (low + high) / 2
 
 		//create clustered network: reaches max possible strikes at 1978 distance
-		consistentChain, _, _ := create_graph_with_C_clusters(len(clusterSizes), clusterSizes, median)
+		consistentChain, _, _ := Create_graph_with_C_clusters(len(clusterSizes), clusterSizes, median)
 
 		//set liar
-		inconsistentChain := set_lies_to_clusters(0, consistentChain)
+		inconsistentChain := Set_lies_to_clusters(0, consistentChain)
 
 		thresh := UpperThreshold(N)
 		//threshold := strconv.Itoa(thresh)
-		blacklist, err := CreateBlacklist(inconsistentChain, 0, false, true, thresh)
+		blacklist, err := CreateBlacklist(inconsistentChain, 0, false, true, thresh, withSuspects)
 		if err != nil {
 			log.Print(err)
 		}
@@ -224,13 +231,13 @@ func SubsetLengthKSummingToS(K int, S int) [][]int {
 
 	for _, set := range powerSet {
 		if len(set) == K {
-			if checkSum(set, S) {
+			if CheckSum(set, S) {
 				subset = append(subset, set)
 			}
 
-			vars := variantsOfSet(set, 0, 0, make([][]int, 0))
+			vars := VariantsOfSet(set, 0, 0, make([][]int, 0))
 			for _, variant := range vars {
-				if checkSum(variant, S) {
+				if CheckSum(variant, S) {
 					subset = append(subset, variant)
 				}
 			}
@@ -240,7 +247,7 @@ func SubsetLengthKSummingToS(K int, S int) [][]int {
 	return subset
 }
 
-func copyArray(array []int) []int {
+func CopyArray(array []int) []int {
 	newArray := make([]int, len(array))
 	for i, val := range array {
 		newArray[i] = val
@@ -248,7 +255,7 @@ func copyArray(array []int) []int {
 	return newArray
 }
 
-func checkSum(set []int, sum int) bool {
+func CheckSum(set []int, sum int) bool {
 	setSum := 0
 	for _, elem := range set {
 		setSum += elem
@@ -275,18 +282,18 @@ func PowerSet(original []int) [][]int {
 	return result
 }
 
-func variantsOfSet(original []int, valueIndex int, startIndex int, result [][]int) [][]int {
+func VariantsOfSet(original []int, valueIndex int, startIndex int, result [][]int) [][]int {
 	if startIndex >= len(original) || valueIndex >= len(original) {
 		return result
 	}
-	newArray := copyArray(original)
+	newArray := CopyArray(original)
 	newArray[startIndex] = original[valueIndex]
 	result = append(result, newArray)
 
-	result = variantsOfSet(original, valueIndex, startIndex+1, result)
-	result = variantsOfSet(original, valueIndex+1, startIndex, result)
-	result = variantsOfSet(newArray, valueIndex, startIndex+1, result)
-	result = variantsOfSet(newArray, valueIndex+1, startIndex, result)
+	result = VariantsOfSet(original, valueIndex, startIndex+1, result)
+	result = VariantsOfSet(original, valueIndex+1, startIndex, result)
+	result = VariantsOfSet(newArray, valueIndex, startIndex+1, result)
+	result = VariantsOfSet(newArray, valueIndex+1, startIndex, result)
 
 	return result
 

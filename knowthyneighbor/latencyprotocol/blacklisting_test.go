@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.dedis.ch/onet/v3/log"
 )
 
-func TestBlacklistOneLiar(t *testing.T) {
+func TestBlacklist1Liar7Nodes(t *testing.T) {
 	N := 7
 	d := 0 * time.Nanosecond
 
@@ -28,12 +29,7 @@ func TestBlacklistOneLiar(t *testing.T) {
 
 	for index := range nodeIDs {
 
-		blacklist, err := CreateBlacklist(chain, d, false, false, -1)
-
-		suspects := BlacklistEnhancement(chain, N)
-		for _, suspect := range suspects {
-			blacklist.AddWithStrikesStringKey(suspect, 0)
-		}
+		blacklist, err := CreateBlacklist(chain, d, false, false, -1, true)
 
 		blacklists[index] = blacklist
 
@@ -42,6 +38,8 @@ func TestBlacklistOneLiar(t *testing.T) {
 	}
 
 	firstBlacklist := blacklists[0]
+
+	log.Print(firstBlacklist.ToString())
 
 	require.Equal(t, 1, firstBlacklist.Size())
 
@@ -54,6 +52,7 @@ func TestBlacklistOneLiar(t *testing.T) {
 	//expect both liar and victim to get 2 strikes
 	require.Equal(t, 1, strikes[90])
 	require.Equal(t, 1, len(strikes))
+	require.True(t, firstBlacklist.ContainsAsString("N0"))
 
 	for _, blacklist := range blacklists[1:] {
 		require.True(t, blacklist.Equals(&firstBlacklist))
@@ -61,7 +60,60 @@ func TestBlacklistOneLiar(t *testing.T) {
 
 }
 
-func TestBlacklistTwoLiars(t *testing.T) {
+func TestBlacklist2Liars7Nodes(t *testing.T) {
+	N := 7
+	d := 0 * time.Nanosecond
+
+	blacklists := make([]Blacklistset, N)
+
+	chain, nodeIDs := simpleChain(N)
+
+	setLiarAndVictim(chain, "N0", "N2", 200)
+	setLiarAndVictim(chain, "N0", "N3", 2000)
+	setLiarAndVictim(chain, "N0", "N4", 20000)
+	setLiarAndVictim(chain, "N0", "N5", 200000)
+	setLiarAndVictim(chain, "N0", "N6", 2000000)
+
+	setLiarAndVictim(chain, "N1", "N2", 200)
+	setLiarAndVictim(chain, "N1", "N3", 2000)
+	setLiarAndVictim(chain, "N1", "N4", 20000)
+	setLiarAndVictim(chain, "N1", "N5", 200000)
+	setLiarAndVictim(chain, "N1", "N6", 2000000)
+
+	for index := range nodeIDs {
+
+		blacklist, err := CreateBlacklist(chain, d, false, false, -1, true)
+
+		blacklists[index] = blacklist
+
+		require.NoError(t, err)
+
+	}
+
+	firstBlacklist := blacklists[0]
+
+	require.Equal(t, 2, firstBlacklist.Size())
+
+	strikes := make(map[int]int, 0)
+
+	for _, strikeNb := range firstBlacklist.Strikes {
+		strikes[strikeNb]++
+	}
+
+	log.Print(firstBlacklist.ToString())
+
+	//expect both liar and victim to get 2 strikes
+	require.Equal(t, 2, strikes[1])
+	require.True(t, firstBlacklist.ContainsAsString("N0"))
+	require.True(t, firstBlacklist.ContainsAsString("N1"))
+
+	for _, blacklist := range blacklists[1:] {
+		require.True(t, blacklist.Equals(&firstBlacklist))
+	}
+
+}
+
+func TestBlacklist2Liars14Nodes(t *testing.T) {
 	N := 14
 	d := 0 * time.Nanosecond
 
@@ -99,12 +151,7 @@ func TestBlacklistTwoLiars(t *testing.T) {
 
 	for index := range nodeIDs {
 
-		blacklist, err := CreateBlacklist(chain, d, false, false, -1)
-
-		suspects := BlacklistEnhancement(chain, N)
-		for _, suspect := range suspects {
-			blacklist.AddWithStrikesStringKey(suspect, 0)
-		}
+		blacklist, err := CreateBlacklist(chain, d, false, false, -1, true)
 
 		blacklists[index] = blacklist
 
@@ -126,8 +173,99 @@ func TestBlacklistTwoLiars(t *testing.T) {
 	require.Equal(t, 2, strikes[468])
 	require.Equal(t, 1, len(strikes))
 
+	require.True(t, firstBlacklist.ContainsAsString("N0"))
+	require.True(t, firstBlacklist.ContainsAsString("N1"))
+
 	for _, blacklist := range blacklists[1:] {
 		require.True(t, blacklist.Equals(&firstBlacklist))
 	}
 
+}
+
+func TestBlacklist1Victim(t *testing.T) {
+	N := 7
+	d := 0 * time.Nanosecond
+
+	blacklists := make([]Blacklistset, N)
+
+	chain, nodeIDs := simpleChain(N)
+
+	setLiarAndVictim(chain, "N0", "N6", 2000000)
+	setLiarAndVictim(chain, "N1", "N6", 2000000)
+
+	for index := range nodeIDs {
+
+		blacklist, err := CreateBlacklist(chain, d, false, false, -1, true)
+
+		blacklists[index] = blacklist
+
+		require.NoError(t, err)
+
+	}
+
+	firstBlacklist := blacklists[0]
+
+	//none blacklisted - we prefer not blacklisting anyone over blacklisting a victim
+	require.Equal(t, 0, firstBlacklist.Size())
+
+	strikes := make(map[int]int, 0)
+
+	for _, strikeNb := range firstBlacklist.Strikes {
+		strikes[strikeNb]++
+	}
+
+	log.Print(firstBlacklist.ToString())
+
+	for _, blacklist := range blacklists[1:] {
+		require.True(t, blacklist.Equals(&firstBlacklist))
+	}
+
+}
+
+func TestBlacklist2Victims(t *testing.T) {
+	N := 7
+	d := 0 * time.Nanosecond
+
+	blacklists := make([]Blacklistset, N)
+
+	chain, nodeIDs := simpleChain(N)
+
+	setLiarAndVictim(chain, "N0", "N6", 2000000)
+	setLiarAndVictim(chain, "N1", "N6", 2000000)
+
+	setLiarAndVictim(chain, "N0", "N5", 50000)
+	setLiarAndVictim(chain, "N1", "N5", 50000)
+
+	for index := range nodeIDs {
+
+		blacklist, err := CreateBlacklist(chain, d, false, false, -1, true)
+
+		blacklists[index] = blacklist
+
+		require.NoError(t, err)
+
+	}
+
+	firstBlacklist := blacklists[0]
+
+	//two liars caught thanks to enhancement
+	require.Equal(t, 2, firstBlacklist.Size())
+
+	strikes := make(map[int]int, 0)
+
+	for _, strikeNb := range firstBlacklist.Strikes {
+		strikes[strikeNb]++
+	}
+
+	require.Equal(t, 2, strikes[1])
+	require.Equal(t, 1, len(strikes))
+
+	require.True(t, firstBlacklist.ContainsAsString("N0"))
+	require.True(t, firstBlacklist.ContainsAsString("N1"))
+
+	log.Print(firstBlacklist.ToString())
+
+	for _, blacklist := range blacklists[1:] {
+		require.True(t, blacklist.Equals(&firstBlacklist))
+	}
 }

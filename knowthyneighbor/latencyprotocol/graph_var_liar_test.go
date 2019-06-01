@@ -61,6 +61,7 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 	//=> configure X, Y, Blacklist values for graphing, write to file
 
 	N := graphDesign.NbNodes
+	withSuspects := true
 
 	//1) Create chain with No TIVs or liars
 	consistentChain, _ := consistentChain(N, 0)
@@ -91,7 +92,7 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 
 		log.Print(strconv.Itoa(index))
 
-		_, unthreshedBlacklist, mapping, err := createLyingNetworkWithMapping(&liarSet, graphDesign, consistentChain, &lies)
+		_, unthreshedBlacklist, mapping, err := createLyingNetworkWithMapping(&liarSet, graphDesign, consistentChain, &lies, withSuspects)
 		if err != nil {
 			return err
 		}
@@ -131,7 +132,8 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 }
 
 func createLyingNetworkWithMapping(
-	liarSet *([]int), graphDesign *GraphDesign, consistentChain *Chain, lies *([]int)) (*Chain, *Blacklistset, map[int][]int, error) {
+	liarSet *([]int), graphDesign *GraphDesign,
+	consistentChain *Chain, lies *([]int), withSuspects bool) (*Chain, *Blacklistset, map[int][]int, error) {
 
 	N := graphDesign.NbNodes
 	nodeLieMap := make(map[int][]int)
@@ -200,7 +202,7 @@ func createLyingNetworkWithMapping(
 	log.Print("Lies set")
 
 	//3) Create the blacklist of the chain
-	blacklist, _ := CreateBlacklist(inconsistentChain, 0, false, true, 0)
+	blacklist, _ := CreateBlacklist(inconsistentChain, 0, false, true, 0, withSuspects)
 
 	log.Print("Create blacklist")
 

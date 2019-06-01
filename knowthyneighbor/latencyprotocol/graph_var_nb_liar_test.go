@@ -28,17 +28,18 @@ func TestFixedLieIncreasingNbLiarsCreation(t *testing.T) {
 	nbNodes := 100
 	nbLiars := 33
 	nbLiarCombinations := 100
+	withSuspects := true
 
 	graphDesign := &GraphDesign{nbNodes, nbLiars, nbNodes, 500, 1000, lowerBoundLies, upperBoundLies, nbLiarCombinations}
 
-	err := CreateFixedLieIncreasingLiesData("test_map_fixed_lies_x_liars_clustered_100", false, graphDesign)
+	err := CreateFixedLieIncreasingLiesData("test_map_fixed_lies_x_liars_clustered_100_with_suspects", false, graphDesign, withSuspects)
 	if err != nil {
 		log.Print(err)
 	}
 
 }
 
-func CreateFixedLieIncreasingLiesData(filename string, randomLiars bool, graphDesign *GraphDesign) error {
+func CreateFixedLieIncreasingLiesData(filename string, randomLiars bool, graphDesign *GraphDesign, withSuspects bool) error {
 
 	//4) Create a graph where each original latency is on the x-axis,
 	//each corresponding latency actually recorded in the chain is on the y-axis,
@@ -83,7 +84,7 @@ func CreateFixedLieIncreasingLiesData(filename string, randomLiars bool, graphDe
 		for _, lieClusterSize := range lieClusterSizes {
 			subset := liarSet[:lieClusterSize]
 
-			_, unthreshedBlacklist, mapping, err := createLyingNetworkWithMapping(&subset, graphDesign, consistentChain, &lies)
+			_, unthreshedBlacklist, mapping, err := createLyingNetworkWithMapping(&subset, graphDesign, consistentChain, &lies, withSuspects)
 			if err != nil {
 				return err
 			}

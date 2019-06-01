@@ -2,6 +2,8 @@
 benchmarking_test allows us to measure and compare the latencies of a ping message
 to a latency measurement by our five-way messagin system.
 
+Note: results will be printed in the terminal
+
 */
 package latencyprotocol
 
