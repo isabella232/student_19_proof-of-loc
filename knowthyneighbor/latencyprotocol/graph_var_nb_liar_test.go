@@ -1,3 +1,16 @@
+/*
+ This file allows us to measure how many liars are blacklisted for a fixed set of lies and a varying number of liars.
+
+ There are multiple configurable variables (see below)
+
+ Once configured, the test should be run from the terminal within the latencyprotocol folder using the command:
+
+	go test -run TestIncreasingNbLiarsCreation -timeout=24h
+
+
+ The generated data can be found under python_graphs/var_nb_liars, as can the jupyter notebooks to create the graphs
+*/
+
 package latencyprotocol
 
 /**
@@ -19,27 +32,51 @@ import (
 	"go.dedis.ch/onet/v3/log"
 )
 
-func TestFixedLieIncreasingNbLiarsCreation(t *testing.T) {
+func TestIncreasingNbLiarsCreation(t *testing.T) {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	lowerBoundLies := 1000
-	upperBoundLies := 50000
-
+	//configs =====================================================================================================
+	lowerBoundLies := 1000  //lower bound on difference between true latency and lie told about it
+	upperBoundLies := 50000 //upper bound on difference between true latency and lie told about it
 	nbNodes := 100
-	nbLiars := 33
-	nbLiarCombinations := 100
-	withSuspects := true
+	maxNbLiars := 33
+	lieClusterSizes := []int{5, 10, 20, 33}
+	nbLiarCombinations := 100 //nb different combinations of liars chosen throughout test
+	randomLiars := false      //whether the liars are chosen randomly or within same cluster
+	withSuspects := true      //activate enhanced blacklisting
+	//=============================================================================================================
 
-	graphDesign := &GraphDesign{nbNodes, nbLiars, nbNodes, 500, 1000, lowerBoundLies, upperBoundLies, nbLiarCombinations}
+	if int(nbNodes/3) < maxNbLiars {
+		log.Print("Error: cannot have more than N/3 liars")
+		return
+	}
 
-	err := CreateFixedLieIncreasingLiesData("test_map_fixed_lies_x_liars_clustered_100_with_suspects", false, graphDesign, withSuspects)
+	random := "random_liars"
+	if !randomLiars {
+		random = "clustered_liars"
+	}
+
+	filename := "test_" +
+		strconv.Itoa(nbNodes) + "_nodes_up_to_" +
+		strconv.Itoa(maxNbLiars) + "_liars" +
+		"_var_liars_distance_" + strconv.Itoa(upperBoundLies) +
+		"_" + random +
+		"_" + strconv.Itoa(nbLiarCombinations) + "_combinations"
+
+	if withSuspects {
+		filename += "_with_suspects"
+	}
+
+	graphDesign := &GraphDesign{nbNodes, maxNbLiars, nbNodes, 500, lowerBoundLies, lowerBoundLies, upperBoundLies, nbLiarCombinations}
+
+	err := CreateFixedLieIncreasingLiesData(filename, false, graphDesign, withSuspects, lieClusterSizes)
 	if err != nil {
 		log.Print(err)
 	}
 
 }
 
-func CreateFixedLieIncreasingLiesData(filename string, randomLiars bool, graphDesign *GraphDesign, withSuspects bool) error {
+func CreateFixedLieIncreasingLiesData(filename string, randomLiars bool, graphDesign *GraphDesign, withSuspects bool, lieClusterSizes []int) error {
 
 	//4) Create a graph where each original latency is on the x-axis,
 	//each corresponding latency actually recorded in the chain is on the y-axis,
@@ -62,7 +99,7 @@ func CreateFixedLieIncreasingLiesData(filename string, randomLiars bool, graphDe
 		liarSets = pickClusteredLiars(consistentChain, graphDesign.NbLiars, graphDesign.NbLiarCombinations)
 	}
 
-	file, err := os.Create("../../python_graphs/data/fixed_lies/" + filename + ".csv")
+	file, err := os.Create("../../python_graphs/var_nb_liars/data/" + filename + ".csv")
 	if err != nil {
 		log.Fatal("Cannot create file", err)
 	}
@@ -74,8 +111,6 @@ func CreateFixedLieIncreasingLiesData(filename string, randomLiars bool, graphDe
 	lies := GetLies(graphDesign.NbLiars, graphDesign.NbVictims, graphDesign.LowerBoundLies, graphDesign.UpperBoundLies)
 
 	log.Print("got lies")
-
-	lieClusterSizes := []int{5, 10, 20, 33}
 
 	for index, liarSet := range liarSets {
 
