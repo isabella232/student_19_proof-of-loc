@@ -38,9 +38,9 @@ func TestMultiliarClusterInfiltrationGraphCreation(t *testing.T) {
 
 	//configs ==================================================================================================================
 	distance := 100000
-	nbClusters := 3
-	nbLiars := 2
-	nbNodesRange := []int{11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26}
+	nbClusters := 2
+	nbLiars := 4
+	nbNodesRange := []int{13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26}
 	withSuspects := true
 	//==========================================================================================================================
 
@@ -73,7 +73,7 @@ func TestMultiliarClusterInfiltrationGraphCreation(t *testing.T) {
 			for _, clusterSize := range clusterSizeRotated {
 				consistentChain, _, _ := Create_graph_with_C_clusters(len(clusterSize), clusterSize, distance)
 
-				inconsistentChain := set_multiple_lies_to_clusters(2, consistentChain)
+				inconsistentChain := set_multiple_lies_to_clusters(nbLiars, consistentChain)
 
 				thresh := UpperThreshold(N)
 				blacklist, err := CreateBlacklist(inconsistentChain, 0, false, true, thresh, withSuspects)
