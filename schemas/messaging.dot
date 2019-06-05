@@ -1,0 +1,21 @@
+digraph G {
+rankdir=LR;
+graph [splines=spline ]
+    subgraph cluster1 {
+        label="A";
+        A1;
+        A2;  
+        A3;
+    }
+    subgraph cluster2 {
+        label="B";
+        B1;
+        B2;
+        B3;
+    }
+A1 -> B1[label="public_key_A, nonce_A, timestamp_A1"];
+B1 -> A2[label="nonce_A, timestamp_B1, nonce_B"];
+A2 -> B2[label="nonce_B, latency_ABA, sig_A[latency_ABA]"];
+B2-> A3[label="latency_BAB, sig_B[latency_BAB], sigA[timestamp_B2, sig_A[latency_ABA]]"];
+A3 -> B3[label="sig_A[timestamp_A3, sigB[latency_BAB]]"];
+}

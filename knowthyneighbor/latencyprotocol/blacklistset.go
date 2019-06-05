@@ -175,23 +175,6 @@ func (set *Blacklistset) ToString() string {
 	return str
 }
 
-//ToStringFake returns a string format of the Strikes of an artificial network
-func (set *Blacklistset) ToStringFake() string {
-	if set.IsEmpty() {
-		return "Blacklist empty\n"
-	}
-
-	str := "\n"
-	for i := 0; i < len(set.Strikes); i++ {
-		key := "N" + strconv.Itoa(i)
-		val := set.Strikes[key]
-		if val > 0 {
-			str += key + ": " + strconv.Itoa(val) + "\n"
-		}
-	}
-	return str
-}
-
 //NodesToString simply print which nodes are blacklisted
 func (set *Blacklistset) NodesToString() string {
 

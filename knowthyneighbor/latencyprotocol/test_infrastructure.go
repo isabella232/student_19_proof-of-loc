@@ -181,9 +181,13 @@ func consistentChain(nbNodes int, startIndex int) (*Chain, []string) {
 		latencies := make(map[string]ConfirmedLatency)
 
 		for j := 0; j < nbNodes; j++ {
-			if j != i {
+			if j > i {
 				lat := rand.Intn(500) + 500
 				latencies[numbersToNodes(j+startIndex)] = ConfirmedLatency{time.Duration(lat), nil, time.Now(), nil}
+			} else {
+				if j < i {
+					latencies[numbersToNodes(j+startIndex)] = blocks[j].Latencies[numbersToNodes(i)]
+				}
 			}
 		}
 

@@ -40,9 +40,9 @@ func TestIncreasingNbLiarsCreation(t *testing.T) {
 	upperBoundLies := 50000 //upper bound on difference between true latency and lie told about it
 	nbNodes := 100
 	maxNbLiars := 33
-	lieClusterSizes := []int{5, 10, 20, 33}
+	lieClusterSizes := []int{5, 10, 15, 20, 25, 27, 30, 33}
 	nbLiarCombinations := 100 //nb different combinations of liars chosen throughout test
-	randomLiars := false      //whether the liars are chosen randomly or within same cluster
+	randomLiars := true       //whether the liars are chosen randomly or within same cluster
 	withSuspects := true      //activate enhanced blacklisting
 	//=============================================================================================================
 

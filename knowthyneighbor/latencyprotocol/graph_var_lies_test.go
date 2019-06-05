@@ -29,13 +29,13 @@ import (
 func TestVarLiesGraphCreation(t *testing.T) {
 
 	//configs =====================================================================================================
-	linear := false       //collect data as sum or as percentage
+	linear := true        //collect data as sum or as percentage
 	withSuspects := true  //use enhanced blacklisting algorithm
 	singleVictim := false //liars target single victim
 	coordinated := false  //liars coordinate (their lies do not contradict each other)
 	nbNodes := 100
 	nbLiars := 33
-	maxLatency := 20000 //the maximum amount by which a lie deviates from the corresponding latency's true value
+	maxLatency := 850 //the maximum amount by which a lie deviates from the corresponding latency's true value
 
 	verbose := true //print information about test to terminal
 
@@ -83,7 +83,7 @@ func TestVarLiesGraphCreation(t *testing.T) {
 func CreateFixedLiarLinearGraphData(N int, nbLiars int, filename string,
 	withSuspects bool, singleVictim bool, coordinated bool, maxLatency int, verbose bool) error {
 
-	consistentChain, inconsistentChain, blacklist, err := createFixedLiarHonestAndLyingNetworks(
+	consistentChain, inconsistentChain, blacklist, err := CreateFixedLiarHonestAndLyingNetworks(
 		N, nbLiars, withSuspects, singleVictim, coordinated, maxLatency, verbose)
 
 	if err != nil {
@@ -138,7 +138,7 @@ func CreateFixedLiarPercentageGraphData(N int, nbLiars int, filename string,
 	// 0, 1 or 2 nodes recorded as blacklisted
 	//=> configure X, Y, Blacklist values for graphing, write to file
 
-	consistentChain, inconsistentChain, blacklist, err := createFixedLiarHonestAndLyingNetworks(
+	consistentChain, inconsistentChain, blacklist, err := CreateFixedLiarHonestAndLyingNetworks(
 		N, nbLiars, withSuspects, singleVictim, coordinated, maxLatency, verbose)
 	thresh := UpperThreshold(N)
 	threshold := strconv.Itoa(thresh)
@@ -179,16 +179,13 @@ func CreateFixedLiarPercentageGraphData(N int, nbLiars int, filename string,
 
 }
 
-func createFixedLiarHonestAndLyingNetworks(N int, nbLiars int, withSuspects bool, singleVictim bool, coordinated bool, maxLatency int, verbose bool) (
+func CreateFixedLiarHonestAndLyingNetworks(N int, nbLiars int, withSuspects bool, singleVictim bool, coordinated bool, maxLatency int, verbose bool) (
 	*Chain, *Chain, *Blacklistset, error) {
 
 	//1) Create chain with No TIVs or liars
 	consistentChain, _ := consistentChain(N, 0)
-	log.Print("Created Consistent Graph")
 
 	testBlacklist, _ := CreateBlacklist(consistentChain, 0, false, true, 0, withSuspects)
-
-	log.Print("Created Blacklist for consistent")
 
 	if !testBlacklist.IsEmpty() {
 		log.Print(testBlacklist.ToString())
@@ -197,7 +194,6 @@ func createFixedLiarHonestAndLyingNetworks(N int, nbLiars int, withSuspects bool
 
 	//2) Modify some of the latencies so they might no longer be consistent
 	inconsistentChain := consistentChain.Copy()
-	log.Print("Copied Consistent Graph")
 
 	//All liars target 1 victim
 
@@ -227,7 +223,9 @@ func createFixedLiarHonestAndLyingNetworks(N int, nbLiars int, withSuspects bool
 
 		for n1 := 0; n1 < nbLiars; n1++ {
 
-			log.Print("Liar: " + numbersToNodes(n1))
+			if verbose {
+				log.Print("Liar: " + numbersToNodes(n1))
+			}
 
 			//liars not attacking each other: n2 := nbLiars
 			for n2 := 0; n2 < N; n2++ {
@@ -248,19 +246,13 @@ func createFixedLiarHonestAndLyingNetworks(N int, nbLiars int, withSuspects bool
 							newLatency = (oldLatency + adder)
 						}
 					}
-
 					setLiarAndVictim(inconsistentChain, numbersToNodes(n1), numbersToNodes(n2), time.Duration(newLatency))
 				}
 			}
 		}
 	}
 
-	log.Print("Lies set")
-
-	//3) Create the blacklist of the chain
 	blacklist, _ := CreateBlacklist(inconsistentChain, 0, verbose, false, 0, withSuspects)
-
-	log.Print("Create blacklist")
 
 	return consistentChain, inconsistentChain, &blacklist, nil
 

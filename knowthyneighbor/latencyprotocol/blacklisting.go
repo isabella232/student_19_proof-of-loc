@@ -2,6 +2,7 @@ package latencyprotocol
 
 import (
 	"log"
+	"sort"
 
 	"strconv"
 	"time"
@@ -69,6 +70,7 @@ func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool, threshGive
 									blacklist.Add(sigAlg.PublicKey([]byte(Bstring)))
 									blacklist.Add(sigAlg.PublicKey([]byte(Cstring)))
 									blacklist.Add(sigAlg.PublicKey([]byte(Dstring)))
+
 								}
 
 							}
@@ -82,11 +84,10 @@ func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool, threshGive
 
 	if verbose {
 		log.Print("Before Thresholding: ")
-		log.Print(blacklist.ToStringFake())
+		log.Print(blacklist.ToString())
 	}
 
 	threshBlacklist := blacklist.GetBlacklistWithThreshold(threshold)
-
 	if withSuspect == true {
 		suspects := BlacklistEnhancement(chain, N)
 		for _, suspect := range suspects {
@@ -98,7 +99,7 @@ func CreateBlacklist(chain *Chain, delta time.Duration, verbose bool, threshGive
 
 	if verbose {
 		log.Print("After Thresholding: ")
-		log.Print(threshBlacklist.ToStringFake())
+		log.Print(threshBlacklist.ToString())
 	}
 
 	return threshBlacklist, nil
@@ -150,6 +151,7 @@ func checkStrikes(strikelist *Blacklistset, N int) []string {
 		}
 	}
 
+	sort.Strings(suspicious)
 	return suspicious
 }
 
@@ -163,14 +165,6 @@ func SuspectIsLiar(chain *Chain, suspect string, N int) bool {
 	for _, block := range chain.Blocks {
 		blockMapper[string(block.ID.PublicKey)] = block
 	}
-
-	//for each node B
-	//for each node C
-	//for each node D
-	/* Check B -> C, B -> D, C -> D
-	* if triangle of lengths does not result in realistic angles (rule of 3 for triangles),
-	B, C or D needs to be blacklisted -> add (B,C, D) to a "suspicious" list and keep checking B
-	*/
 
 	suspectBlock := blockMapper[suspect]
 
@@ -207,14 +201,15 @@ func SuspectIsLiar(chain *Chain, suspect string, N int) bool {
 	}
 
 	//non-accusers: nodes that do not give more than N/3 strikes (the N/3 might be given by the liars)
-	nbNonAccusers := 0
+	nbAccusers := 0
 	accuserThreshold := int(N / 3)
 	for node, nbStrikes := range blacklist.Strikes {
-		if node != suspect && int(nbStrikes/2) <= accuserThreshold { //divide by 2, because each triangle counted twice
-			nbNonAccusers++
+		if node != suspect && int(nbStrikes/2) > accuserThreshold { //divide by 2, because each triangle counted twice
+			nbAccusers++
 		}
 	}
-	nbNonAccusersNeeded := int(2 * (N / 3))
+	nbNonAccusers := N - nbAccusers
+	nbNonAccusersNeeded := int((2 * N / 3))
 	//nbNonAccusersNeeded := int((N / 3)) + 1 //try this
 
 	//if we cannot find 2N/3 nodes willing to not accuse for the suspect, the suspect is a liar
