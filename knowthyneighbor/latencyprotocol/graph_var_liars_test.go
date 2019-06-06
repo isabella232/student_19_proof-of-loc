@@ -48,13 +48,13 @@ func TestVarLiarsGraphCreation(t *testing.T) {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	//configs =====================================================================================================
-	lowerBoundLies := 1000  //lower bound on difference between true latency and lie told about it
-	upperBoundLies := 50000 //upper bound on difference between true latency and lie told about it
+	lowerBoundLies := 1000 //lower bound on difference between true latency and lie told about it
+	upperBoundLies := 5000 //upper bound on difference between true latency and lie told about it
 	nbNodes := 100
 	nbLiars := 33
 	nbLiarCombinations := 100 //nb different combinations of liars chosen throughout test
-	randomLiars := true       //whether the liars are chosen randomly or within same cluster
-	withSuspects := false     //activate enhanced blacklisting
+	randomLiars := false      //whether the liars are chosen randomly or within same cluster
+	withSuspects := true      //activate enhanced blacklisting
 	//=============================================================================================================
 
 	if int(nbNodes/3) < nbLiars {
@@ -98,13 +98,13 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 	N := graphDesign.NbNodes
 
 	//1) Create chain with No TIVs or liars
-	consistentChain, _ := consistentChain(N, 0)
+	consistentChain, _ := chainWithOnlyConsistentLatencies(N, 0)
 	log.Print("Created Consistent Graph")
 
 	var liarSets [][]int
 
 	if randomLiars {
-		liarSets = Get_M_subsets_of_K_liars_out_of_N_nodes(graphDesign.NbLiarCombinations, graphDesign.NbLiars, graphDesign.NbNodes)
+		liarSets = GetMSubsetsOfKLiarsOutOfNNodes(graphDesign.NbLiarCombinations, graphDesign.NbLiars, graphDesign.NbNodes)
 	} else {
 		log.Print("Picking clustered liars")
 		liarSets = pickClusteredLiars(consistentChain, graphDesign.NbLiars, graphDesign.NbLiarCombinations)
@@ -126,14 +126,16 @@ func CreateFixedLieToEffectMap(filename string, randomLiars bool, graphDesign *G
 
 		log.Print(strconv.Itoa(index))
 
-		_, unthreshedBlacklist, mapping, err := createLyingNetworkWithMapping(&liarSet, graphDesign, consistentChain, &lies, withSuspects)
+		_, blacklist, mapping, err := createLyingNetworkWithMapping(&liarSet, graphDesign, consistentChain, &lies, withSuspects)
 		if err != nil {
 			return err
 		}
 
-		thresh := UpperThreshold(N)
+		log.Print("Blacklist size: " + strconv.Itoa(blacklist.Size()))
 
-		blacklist := unthreshedBlacklist.GetBlacklistWithThreshold(thresh)
+		if withSuspects {
+
+		}
 
 		if err != nil {
 			return err
@@ -229,7 +231,7 @@ func createLyingNetworkWithMapping(
 
 	log.Print("Lies set")
 
-	blacklist, _ := CreateBlacklist(inconsistentChain, 0, false, true, 0, withSuspects)
+	blacklist, _ := CreateBlacklist(inconsistentChain, 0, false, false, 0, withSuspects)
 
 	log.Print("Create blacklist")
 
@@ -246,13 +248,41 @@ func ContainsInt(s []int, e int) bool {
 }
 
 // Get_M_subsets_of_K_liars_out_of_N_nodes does exactly what the name says with numbers as nodes
-func Get_M_subsets_of_K_liars_out_of_N_nodes(M int, K int, N int) [][]int {
+func GetMSubsetsOfKLiarsOutOfNNodes(M int, K int, N int) [][]int {
 	superSet := makeRange(N)
 	current := make([]int, 0)
 	solution := make([][]int, 0)
 	solution = getSubsets(superSet, K, 0, current, solution, M)
 
 	return solution[:M]
+}
+
+func getSubsets(superSet []int, k int, idx int, current []int, solution [][]int, nbNeeded int) [][]int {
+	if len(solution) >= nbNeeded {
+		return solution
+	}
+
+	if len(current) == k {
+		solution = append(solution, current)
+		return solution
+	}
+	if idx == len(superSet) {
+		return solution
+	}
+	x := superSet[idx]
+	current = append(current, x)
+	solution = getSubsets(superSet, k, idx+1, current, solution, nbNeeded)
+	current = current[:len(current)-1]
+	solution = getSubsets(superSet, k, idx+1, current, solution, nbNeeded)
+	return solution
+}
+
+func makeRange(smallerThan int) []int {
+	a := make([]int, smallerThan)
+	for i := range a {
+		a[i] = i
+	}
+	return a
 }
 
 //GetLies generates a pseudo-random set of lies to be reused during fixed lie testing

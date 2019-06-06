@@ -37,10 +37,10 @@ func TestMultiliarClusterInfiltrationGraphCreation(t *testing.T) {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	//configs ==================================================================================================================
-	distance := 100000
+	distance := 1000
 	nbClusters := 2
 	nbLiars := 4
-	nbNodesRange := []int{13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26}
+	nbNodesRange := []int{13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25}
 	withSuspects := true
 	//==========================================================================================================================
 
@@ -71,9 +71,9 @@ func TestMultiliarClusterInfiltrationGraphCreation(t *testing.T) {
 		for _, clusterSizeOrig := range clusterSizes {
 			clusterSizeRotated := RotatedArrays(clusterSizeOrig)
 			for _, clusterSize := range clusterSizeRotated {
-				consistentChain, _, _ := Create_graph_with_C_clusters(len(clusterSize), clusterSize, distance)
+				consistentChain, _, _ := chainWithCClusters(len(clusterSize), clusterSize, distance)
 
-				inconsistentChain := set_multiple_lies_to_clusters(nbLiars, consistentChain)
+				inconsistentChain := setMultipleLiesToClusters(nbLiars, consistentChain)
 
 				thresh := UpperThreshold(N)
 				blacklist, err := CreateBlacklist(inconsistentChain, 0, false, true, thresh, withSuspects)
@@ -94,27 +94,4 @@ func TestMultiliarClusterInfiltrationGraphCreation(t *testing.T) {
 
 	}
 
-}
-
-func set_multiple_lies_to_clusters(nbLiars int, consistentChain *Chain) *Chain {
-
-	inconsistentChain := consistentChain.Copy()
-
-	for i := 0; i < len(inconsistentChain.Blocks); i++ {
-		block := inconsistentChain.Blocks[i]
-
-		for liarID := 0; liarID < nbLiars; liarID++ {
-
-			_, isPresent := block.Latencies[numbersToNodes(liarID)]
-			if isPresent {
-
-				//Normal range within cluster
-				lat := rand.Intn(500) + 500
-				inconsistentChain.Blocks[liarID].Latencies[numbersToNodes(i)] = ConfirmedLatency{time.Duration(lat), nil, time.Now(), nil}
-				block.Latencies[numbersToNodes(liarID)] = ConfirmedLatency{time.Duration(lat), nil, time.Now(), nil}
-			}
-		}
-	}
-
-	return inconsistentChain
 }

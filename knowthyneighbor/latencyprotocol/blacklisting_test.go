@@ -18,7 +18,7 @@ func TestBlacklist1Liar7Nodes(t *testing.T) {
 
 	blacklists := make([]Blacklistset, N)
 
-	chain, nodeIDs := simpleChain(N)
+	chain, nodeIDs := chainWithAllLatenciesSame(N, 10)
 
 	setLiarAndVictim(chain, "N0", "N1", 70)
 	setLiarAndVictim(chain, "N0", "N2", 200)
@@ -66,7 +66,7 @@ func TestBlacklist2Liars7Nodes(t *testing.T) {
 
 	blacklists := make([]Blacklistset, N)
 
-	chain, nodeIDs := simpleChain(N)
+	chain, nodeIDs := chainWithAllLatenciesSame(N, 10)
 
 	setLiarAndVictim(chain, "N0", "N2", 200)
 	setLiarAndVictim(chain, "N0", "N3", 2000)
@@ -119,7 +119,7 @@ func TestBlacklist2Liars14Nodes(t *testing.T) {
 
 	blacklists := make([]Blacklistset, N)
 
-	chain, nodeIDs := simpleChain(N)
+	chain, nodeIDs := chainWithAllLatenciesSame(N, 10)
 
 	setLiarAndVictim(chain, "N0", "N1", 70)
 	setLiarAndVictim(chain, "N0", "N2", 200)
@@ -188,7 +188,7 @@ func TestBlacklist1Victim(t *testing.T) {
 
 	blacklists := make([]Blacklistset, N)
 
-	chain, nodeIDs := simpleChain(N)
+	chain, nodeIDs := chainWithAllLatenciesSame(N, 10)
 
 	setLiarAndVictim(chain, "N0", "N6", 2000000)
 	setLiarAndVictim(chain, "N1", "N6", 2000000)
@@ -220,52 +220,4 @@ func TestBlacklist1Victim(t *testing.T) {
 		require.True(t, blacklist.Equals(&firstBlacklist))
 	}
 
-}
-
-func TestBlacklist2Victims(t *testing.T) {
-	N := 7
-	d := 0 * time.Nanosecond
-
-	blacklists := make([]Blacklistset, N)
-
-	chain, nodeIDs := simpleChain(N)
-
-	setLiarAndVictim(chain, "N0", "N6", 2000000)
-	setLiarAndVictim(chain, "N1", "N6", 2000000)
-
-	setLiarAndVictim(chain, "N0", "N5", 50000)
-	setLiarAndVictim(chain, "N1", "N5", 50000)
-
-	for index := range nodeIDs {
-
-		blacklist, err := CreateBlacklist(chain, d, false, false, -1, true)
-
-		blacklists[index] = blacklist
-
-		require.NoError(t, err)
-
-	}
-
-	firstBlacklist := blacklists[0]
-
-	//two liars caught thanks to enhancement
-	require.Equal(t, 2, firstBlacklist.Size())
-
-	strikes := make(map[int]int, 0)
-
-	for _, strikeNb := range firstBlacklist.Strikes {
-		strikes[strikeNb]++
-	}
-
-	require.Equal(t, 2, strikes[1])
-	require.Equal(t, 1, len(strikes))
-
-	require.True(t, firstBlacklist.ContainsAsString("N0"))
-	require.True(t, firstBlacklist.ContainsAsString("N1"))
-
-	log.Print(firstBlacklist.ToString())
-
-	for _, blacklist := range blacklists[1:] {
-		require.True(t, blacklist.Equals(&firstBlacklist))
-	}
 }

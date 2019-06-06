@@ -29,7 +29,7 @@ const benchmarkDelta = 50 * time.Millisecond
 //Tool for slowing down latencies: https://bencane.com/2012/07/16/tc-adding-simulated-network-latency-to-your-linux-server/
 func TestCompareLatenciesToPings(t *testing.T) {
 
-	NbIterations := 2
+	NbIterations := 1
 
 	block1Latencies := make([]time.Duration, NbIterations)
 	block2Latencies := make([]time.Duration, NbIterations)

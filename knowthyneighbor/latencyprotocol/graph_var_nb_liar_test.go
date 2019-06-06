@@ -36,8 +36,8 @@ func TestIncreasingNbLiarsCreation(t *testing.T) {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	//configs =====================================================================================================
-	lowerBoundLies := 1000  //lower bound on difference between true latency and lie told about it
-	upperBoundLies := 50000 //upper bound on difference between true latency and lie told about it
+	lowerBoundLies := 1000 //lower bound on difference between true latency and lie told about it
+	upperBoundLies := 5000 //upper bound on difference between true latency and lie told about it
 	nbNodes := 100
 	maxNbLiars := 33
 	lieClusterSizes := []int{5, 10, 15, 20, 25, 27, 30, 33}
@@ -87,13 +87,13 @@ func CreateFixedLieIncreasingLiesData(filename string, randomLiars bool, graphDe
 	N := graphDesign.NbNodes
 
 	//1) Create chain with No TIVs or liars
-	consistentChain, _ := consistentChain(N, 0)
+	consistentChain, _ := chainWithOnlyConsistentLatencies(N, 0)
 	log.Print("Created Consistent Graph")
 
 	var liarSets [][]int
 
 	if randomLiars {
-		liarSets = Get_M_subsets_of_K_liars_out_of_N_nodes(graphDesign.NbLiarCombinations, graphDesign.NbLiars, graphDesign.NbNodes)
+		liarSets = GetMSubsetsOfKLiarsOutOfNNodes(graphDesign.NbLiarCombinations, graphDesign.NbLiars, graphDesign.NbNodes)
 	} else {
 		log.Print("Picking clustered liars")
 		liarSets = pickClusteredLiars(consistentChain, graphDesign.NbLiars, graphDesign.NbLiarCombinations)
@@ -119,14 +119,12 @@ func CreateFixedLieIncreasingLiesData(filename string, randomLiars bool, graphDe
 		for _, lieClusterSize := range lieClusterSizes {
 			subset := liarSet[:lieClusterSize]
 
-			_, unthreshedBlacklist, mapping, err := createLyingNetworkWithMapping(&subset, graphDesign, consistentChain, &lies, withSuspects)
+			_, blacklist, mapping, err := createLyingNetworkWithMapping(&subset, graphDesign, consistentChain, &lies, withSuspects)
 			if err != nil {
 				return err
 			}
-			thresh := UpperThreshold(N)
-			//threshold := strconv.Itoa(thresh)
 
-			blacklist := unthreshedBlacklist.GetBlacklistWithThreshold(thresh)
+			log.Print("balcklist size: " + strconv.Itoa(blacklist.Size()))
 
 			if err != nil {
 				return err

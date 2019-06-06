@@ -14,7 +14,7 @@ func TestBlacklistOneLiarNotAllLatencies(t *testing.T) {
 
 	blacklists := make([]Blacklistset, N)
 
-	chain, nodeIDs := simpleChain(N)
+	chain, nodeIDs := chainWithAllLatenciesSame(N, 10)
 
 	setLiarAndVictim(chain, "N0", "N1", 70)
 	setLiarAndVictim(chain, "N0", "N2", 200)
@@ -59,7 +59,7 @@ func TestBlacklistTwoLiarsNotAllLatencies(t *testing.T) {
 
 	blacklists := make([]Blacklistset, N)
 
-	chain, nodeIDs := simpleChain(N)
+	chain, nodeIDs := chainWithAllLatenciesSame(N, 10)
 
 	setLiarAndVictim(chain, "N0", "N1", 70)
 	setLiarAndVictim(chain, "N0", "N2", 200)

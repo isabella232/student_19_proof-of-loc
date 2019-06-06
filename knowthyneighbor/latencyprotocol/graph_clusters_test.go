@@ -42,9 +42,9 @@ func TestSoloClusterInfiltrationGraphCreation(t *testing.T) {
 	//distance := binarySearch(200000, N, clusterSizes)
 
 	//configs ==================================================================================================================
-	distance := 100000
+	distance := 1500
 	nbClusters := 4
-	nbNodesRange := []int{11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26}
+	nbNodesRange := []int{10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	withSuspects := true
 	//==========================================================================================================================
 
@@ -75,10 +75,10 @@ func TestSoloClusterInfiltrationGraphCreation(t *testing.T) {
 		for _, clusterSizeOrig := range clusterSizes {
 			clusterSizeRotated := RotatedArrays(clusterSizeOrig)
 			for _, clusterSize := range clusterSizeRotated {
-				consistentChain, _, _ := Create_graph_with_C_clusters(len(clusterSize), clusterSize, distance)
+				consistentChain, _, _ := chainWithCClusters(len(clusterSize), clusterSize, distance)
 				//test
 
-				inconsistentChain := Set_lies_to_clusters(0, consistentChain)
+				inconsistentChain := setLiesToClusters(0, consistentChain)
 
 				thresh := UpperThreshold(N)
 				blacklist, err := CreateBlacklist(inconsistentChain, 0, false, true, thresh, withSuspects)
@@ -117,85 +117,6 @@ func RotatedArrays(array []int) [][]int {
 	return arrays
 }
 
-func Create_graph_with_C_clusters(C int, clusterSizes []int, distance int) (*Chain, []*Chain, [][]string) {
-
-	clusters := make([]*Chain, C)
-	nodeLists := make([][]string, C)
-
-	N := 0
-
-	for i := 0; i < C; i++ {
-		cluster, nodeList := consistentChain(clusterSizes[i], N)
-		clusters[i] = cluster
-		nodeLists[i] = nodeList
-		N += clusterSizes[i]
-	}
-
-	masterBlocks := make([]*Block, N)
-	masterIndex := 0
-
-	//Steps:
-	//1: for each chain, add latency to blocks of all other chains (careful: latencies go 2 ways -> only give forward)
-	//2: Connect all chains
-
-	//1
-	//for each chain
-	for j := 0; j < C; j++ {
-		cluster := clusters[j]
-
-		//for each block in chain
-		for b := 0; b < len(cluster.Blocks); b++ {
-			block := cluster.Blocks[b]
-
-			//for each other chain
-			for nl := 0; nl < C; nl++ {
-				if nl != j {
-					nodes := nodeLists[nl]
-					for n := 0; n < len(nodes); n++ {
-						node := nodes[n]
-						newLat := ConfirmedLatency{time.Duration(distance), nil, time.Now(), nil}
-						block.Latencies[node] = newLat
-						clusters[nl].Blocks[n].Latencies[numbersToNodes(masterIndex)] = newLat
-					}
-
-				}
-			}
-
-			//Copy completed block to big graph
-			masterBlocks[masterIndex] = block
-			masterIndex++
-
-		}
-	}
-
-	//2
-
-	masterChain := Chain{masterBlocks, []byte("testBucketName")}
-
-	return &masterChain, clusters, nodeLists
-
-}
-
-func Set_lies_to_clusters(liarID int, consistentChain *Chain) *Chain {
-
-	inconsistentChain := consistentChain.Copy()
-
-	for i := 0; i < len(inconsistentChain.Blocks); i++ {
-		block := inconsistentChain.Blocks[i]
-
-		_, isPresent := block.Latencies[numbersToNodes(liarID)]
-		if isPresent {
-
-			//Normal range within cluster
-			lat := rand.Intn(500) + 500
-			inconsistentChain.Blocks[liarID].Latencies[numbersToNodes(i)] = ConfirmedLatency{time.Duration(lat), nil, time.Now(), nil}
-			block.Latencies[numbersToNodes(liarID)] = ConfirmedLatency{time.Duration(lat), nil, time.Now(), nil}
-		}
-	}
-
-	return inconsistentChain
-}
-
 func BinarySearch(initDistance int, N int, clusterSizes []int, withSuspects bool) int {
 
 	low := 0
@@ -207,10 +128,10 @@ func BinarySearch(initDistance int, N int, clusterSizes []int, withSuspects bool
 		median = (low + high) / 2
 
 		//create clustered network: reaches max possible strikes at 1978 distance
-		consistentChain, _, _ := Create_graph_with_C_clusters(len(clusterSizes), clusterSizes, median)
+		consistentChain, _, _ := chainWithCClusters(len(clusterSizes), clusterSizes, median)
 
 		//set liar
-		inconsistentChain := Set_lies_to_clusters(0, consistentChain)
+		inconsistentChain := setLiesToClusters(0, consistentChain)
 
 		thresh := UpperThreshold(N)
 		//threshold := strconv.Itoa(thresh)

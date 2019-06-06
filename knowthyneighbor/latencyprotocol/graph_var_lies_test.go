@@ -29,7 +29,7 @@ import (
 func TestVarLiesGraphCreation(t *testing.T) {
 
 	//configs =====================================================================================================
-	linear := true        //collect data as sum or as percentage
+	linear := false       //collect data as sum or as percentage
 	withSuspects := true  //use enhanced blacklisting algorithm
 	singleVictim := false //liars target single victim
 	coordinated := false  //liars coordinate (their lies do not contradict each other)
@@ -183,7 +183,7 @@ func CreateFixedLiarHonestAndLyingNetworks(N int, nbLiars int, withSuspects bool
 	*Chain, *Chain, *Blacklistset, error) {
 
 	//1) Create chain with No TIVs or liars
-	consistentChain, _ := consistentChain(N, 0)
+	consistentChain, _ := chainWithOnlyConsistentLatencies(N, 0)
 
 	testBlacklist, _ := CreateBlacklist(consistentChain, 0, false, true, 0, withSuspects)
 

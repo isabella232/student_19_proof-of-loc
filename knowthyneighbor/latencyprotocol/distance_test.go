@@ -17,7 +17,7 @@ func TestApproximateDistanceAllInformation(t *testing.T) {
 	N := 3
 	x := 2
 
-	chain, _ := initChain(N, x, accurate, 0, 0)
+	chain, _ := chain(N, x, accurate, 0, 0)
 
 	_, exists := chain.Blocks[0].Latencies[string(chain.Blocks[1].ID.PublicKey)]
 
@@ -48,7 +48,7 @@ func TestApproximateDistanceInaccurateInformation(t *testing.T) {
 	N := 6
 	x := 4
 
-	chain, _ := initChain(N, x, inaccurate, N, N)
+	chain, _ := chain(N, x, inaccurate, N, N)
 
 	_, isValid, err := chain.Blocks[0].ApproximateDistance(chain.Blocks[1], chain.Blocks[2], 0)
 
@@ -76,7 +76,7 @@ func TestApproximateDistanceIncompleteInformation(t *testing.T) {
 	expectedD02 := time.Duration(((2 * 10000) + 1))
 	expectedD12 := Pythagoras(expectedD01, expectedD02)
 
-	chain, _ := initChain(N, x, inaccurate, N, N)
+	chain, _ := chain(N, x, inaccurate, N, N)
 
 	d01, isValid01, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[0], chain.Blocks[1], 10000)
 
@@ -102,7 +102,7 @@ func TestApproximateDistanceMissingInformation(t *testing.T) {
 	N := 5
 	x := 1
 
-	chain, _ := initChain(N, x, accurate, 0, 0)
+	chain, _ := chain(N, x, accurate, 0, 0)
 
 	_, isValid, err := chain.Blocks[2].ApproximateDistance(chain.Blocks[3], chain.Blocks[4], 0)
 
