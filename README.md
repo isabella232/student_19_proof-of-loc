@@ -1,4 +1,4 @@
-#Proof of Location
+# Proof of Location
 __EPFL DEDIS Lab: Semester Project 2019 __
 __Student:__ Sabrina Kall
 __Supervisors:__ Cristina Basescu, Kelong Cong
