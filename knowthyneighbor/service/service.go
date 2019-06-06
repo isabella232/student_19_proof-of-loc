@@ -4,6 +4,9 @@ package service
 import (
 	"crypto/sha256"
 	"errors"
+	"sync"
+	"time"
+
 	"github.com/dedis/student_19_proof-of-loc/knowthyneighbor/blscosiprotocol"
 	"github.com/dedis/student_19_proof-of-loc/knowthyneighbor/latencyprotocol"
 	uuid "github.com/satori/go.uuid"
@@ -14,8 +17,6 @@ import (
 	"go.dedis.ch/onet/v3/network"
 	"go.dedis.ch/protobuf"
 	bbolt "go.etcd.io/bbolt"
-	"sync"
-	"time"
 )
 
 // This file contains all the code to run a BLSCoSi service. It is used to reply to

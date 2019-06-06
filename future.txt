@@ -1,9 +1,0 @@
-* How to run + do graphs
-* Future work: strike patterns
-	Not all latencies
-
-Presentation:
-5 minutes: what we are doing . how it is different, motivation (explain done periodically - one epoch)
-5 minutes: how
-5: performance, results
-
