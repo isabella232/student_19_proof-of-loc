@@ -12,13 +12,16 @@ __Description:__ Implementation of a short-term transaction mechanism based on p
 	- __latencyprotocol__: code for building and testing latency chains
 	- __service__: service for running proof-of-location
 	- __udp__: bottom-layer messaging infrastructure
+* __presentation__: slides presenting the project
 *  __python_graphs__: python jupyter notebooks for graphs
 	- __var_clusters__
  	- __var_clusters_multiliar__
 	- __var_liars__
 	- __var_lies__
 	- __var_nb_liars__
+* __report__: report and LaTeX source files for report
 *  __schemas__: dot files for graphs
+
 
 
 ## Know-thy-neighbor

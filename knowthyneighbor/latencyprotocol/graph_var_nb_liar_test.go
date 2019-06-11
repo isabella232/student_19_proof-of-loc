@@ -36,8 +36,8 @@ func TestIncreasingNbLiarsCreation(t *testing.T) {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	//configs =====================================================================================================
-	lowerBoundLies := 1000 //lower bound on difference between true latency and lie told about it
-	upperBoundLies := 5000 //upper bound on difference between true latency and lie told about it
+	lowerBoundLies := 1000  //lower bound on difference between true latency and lie told about it
+	upperBoundLies := 10000 //upper bound on difference between true latency and lie told about it
 	nbNodes := 100
 	maxNbLiars := 33
 	lieClusterSizes := []int{5, 10, 15, 20, 25, 27, 30, 33}

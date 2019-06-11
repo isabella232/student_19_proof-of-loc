@@ -53,7 +53,7 @@ func TestVarLiarsGraphCreation(t *testing.T) {
 	nbNodes := 100
 	nbLiars := 33
 	nbLiarCombinations := 100 //nb different combinations of liars chosen throughout test
-	randomLiars := false      //whether the liars are chosen randomly or within same cluster
+	randomLiars := true       //whether the liars are chosen randomly or within same cluster
 	withSuspects := true      //activate enhanced blacklisting
 	//=============================================================================================================
 
